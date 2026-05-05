@@ -537,8 +537,8 @@ title('TFest with Speed — 2mm test');
 % and training data that includes velocity as an input
  
 cPath_nl     = 'models/R4_R5/nlgreybox/dec10/';
-dLoadOrTrain_nl = 1;   % 1 = train, 0 = load
-dSaveModels_nl  = 1;
+dLoadOrTrain_nl = 0;   % 1 = train, 0 = load
+dSaveModels_nl  = 0;
  
 % Training/test data must include velocity as second input
 train_data_nl = modify_iddata(all_exps_data(:, [2 3], [5], dExpTrain));
@@ -605,10 +605,12 @@ end
 figure;
 compare(getexp(test_data_nl_dec, 1), TFest_speed, sys_nlgrey);
 title('NL Grey-box vs TFest-Speed — 4mm test');
+improvePlot;
  
 figure;
 compare(getexp(test_data_nl_dec, 2), TFest_speed, sys_nlgrey);
 title('NL Grey-box vs TFest-Speed — 2mm test');
+improvePlot;
 
 %% Check train and test data — R4-R5 with speed and u1
 train_data = modify_iddata(all_exps_data(:, [2 3], [2 5], dExpTrain));

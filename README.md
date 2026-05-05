@@ -46,11 +46,14 @@ that build on each other and should be run **in order**, section by section
 | Black-box tfest (Y4 only) | 89.6% | 70.2% |
 | Grey-box (greyest) | 89.2% | 65.6% |
 | Hybrid (grey-box + residual) | 96.3% | 94.3% |
-| Black-box tfest (Y4 + velocity) | ~97.5% | ~95.0% |
+| Black-box tfest (Y4 + velocity) | 97.7% | 95.5% |
+| Nonlinear grey-box (nlgreyest) | 89.2% | 65.6% |
 
 The physical beam equations capture the dynamics well. The dominant error is a small
 DC offset, not missing dynamics. The hybrid model corrects this without sacrificing
-physical interpretability.
+physical interpretability. See the Interpretation section below for a detailed
+explanation of what the DC offset is, why it exists, and why the velocity model
+performs so well.
 
 ---
 
@@ -169,8 +172,9 @@ take a few minutes.
 
 ## Physical Model Background
 
-The web is modelled as a tensioned Euler-Bernoulli beam under lateral loading.
-For each span between rollers, the lateral transfer function takes the form:
+The web is modelled as a tensioned Timoshenko beam under lateral loading, following
+the formulation of Sievers, Balas, and von Flotow (1988). For each span between
+rollers, the lateral transfer function takes the form:
 
     G(s) = [(-f3/tau)s + (f1/tau^2)] / [s^2 + (f2/tau)s + (f1/tau^2)]
 
@@ -185,13 +189,136 @@ Parameters are computed analytically from:
 The grey-box model uses `greyest` to refine tau, f1, f2, f3 from data while
 preserving the beam equation structure. Key findings from estimation:
 
-- tau nearly triples relative to the physical prediction (0.44 to 1.18 s)
-- f3 collapses to zero — no non-minimum phase behaviour observed in practice
+- tau nearly triples relative to the physical prediction (0.44 to 1.18 s),
+  suggesting the effective transport delay is much larger than geometry alone
+  predicts — possibly due to sensor/actuator lag, longer effective web path,
+  or speed-dependent effects not captured by constant-velocity assumption
+- f3 collapses to zero — no non-minimum phase behaviour is observed in practice,
+  meaning the system is actually easier to control than pure theory suggests
 - Most residual error between the physical model and data is a small DC offset,
-  not missing dynamics
+  not missing dynamics (see Interpretation section below)
 
 The difference between `greyest` and `nlgreyest` is that `greyest` fits a single
 fixed set of parameters, while `nlgreyest` allows tau = L/v(t) to vary continuously
 with the measured velocity signal at each timestep. In practice the `nlgreyest`
 approach did not improve significantly over `greyest` for this dataset, likely
 because web speed is approximately constant within each experiment.
+
+---
+
+## Interpretation of Results
+
+### What DC means and what a DC offset is
+
+The term DC (Direct Current) comes from electrical engineering, where it refers to
+a constant, non-varying signal. In control and signal processing, DC has been
+adopted to mean the zero-frequency, constant component of any signal.
+
+In a transfer function G(s), the variable s encodes frequency. Evaluating G(0) —
+plugging in s = 0 — gives the DC gain: the ratio of output to input when the input
+is held perfectly constant forever and the system has fully settled. This is the
+same number you read off a step response once the transient has died out.
+
+For the Sievers physical model:
+
+    G(0) = (f1/tau^2) / (f1/tau^2) = 1
+
+The DC gain is exactly 1 by construction. This reflects a physical truth: with
+perfectly parallel rollers, uniform tension, and a straight web, a lateral
+displacement at the upstream roller propagates downstream unchanged in steady
+state. If y4 holds constant at some value, y5 must eventually settle to that
+same value.
+
+A DC offset is a constant bias between two signals — one is always shifted by a
+fixed amount relative to the other, regardless of the dynamics. In this dataset,
+y5_measured is consistently about 0.0002 mm higher than the physical model
+predicts. This is a zero-frequency error only. The dynamics — poles, zeros,
+frequency response — can all be perfectly correct while this constant shift remains.
+
+
+### Why the DC offset exists
+
+The physical model predicts DC gain = 1 exactly, so any constant difference between
+the measured y4 and y5 signals must come from outside the model. The most likely
+causes in order of probability are:
+
+**Sensor zeroing mismatch (most likely).** y4 and y5 are measured by two separate
+cameras calibrated independently. Standard camera calibration converts pixel
+coordinates to real-world millimetres, but leaves small systematic errors in the
+absolute zero reference. A 0.2 mm calibration error in one camera appears as a
+constant offset in the data regardless of what the web is doing physically.
+
+**Roller misalignment.** The Sievers model assumes all roller axes are exactly
+parallel. Any small skew in a roller axis exerts a steady-state lateral force on
+the web, pushing it to a slightly different equilibrium than the model predicts.
+Deshpande et al. (2026) explicitly note this as a limitation of the physics-based
+approach for this system.
+
+**Web camber.** Real webs have built-in lateral curvature from the manufacturing
+process. A cambered web steers itself toward a preferred lateral position determined
+by its natural geometry, introducing a constant lateral forcing term that is
+entirely absent from the Sievers equations.
+
+**Non-uniform tension.** The model assumes uniform tension across the web width.
+In practice, tension varies due to web formation history, edge effects, and roller
+crown profiles, shifting the equilibrium position slightly.
+
+The key implication is that this is an installation and calibration issue, not a
+modelling failure. The beam dynamics are essentially correct. The DC offset section
+of the script confirms this: correcting for an offset of ~0.0002 mm (less than a
+quarter of a millimetre) improves the physical model from 89% to 96% on the 4mm
+test and from 65% to 93% on the 2mm test. The larger improvement on the 2mm test
+is a mathematical artefact of the NMSE metric — because the 2mm web moves half
+as far, the fixed-size offset represents a larger fraction of the signal variance,
+so correcting it produces a proportionally larger gain in fit percentage.
+
+
+### Why the improvement from adding velocity is not what it appears
+
+Adding velocity as a second input to tfest produces a large performance jump
+(roughly 89% to 97%). It is tempting to interpret this as the model learning
+speed-dependent dynamics — for example, tau = L/v changing as the machine
+accelerates. The actual explanation is more mundane.
+
+The velocity signal is approximately constant within each experiment. Normal speed
+experiments sit at roughly 12.85 velocity units throughout; fast speed experiments
+sit at roughly 20.17. When the optimizer fits a two-input transfer function:
+
+    y5 = G1(s) * y4 + G2(s) * velocity
+
+the G2(s) term has an input that barely varies. The only way a constant input can
+affect the output is through its DC gain. The optimizer discovers that G2(0) = -14.6
+is useful: multiplying -14.6 by the velocity value gives a different constant for
+each experiment, which the model uses as a per-experiment bias correction.
+
+In other words, the velocity channel is not capturing how web dynamics change with
+speed. It is using velocity as a lookup key to identify which experiment is running
+and apply the appropriate DC offset correction. Normal speed experiments get one
+correction, fast speed experiments get another.
+
+This has important consequences for generalization. If the model is evaluated at
+a speed not seen in training, the large DC gain on the velocity channel will
+extrapolate to produce an arbitrary offset that may be completely wrong. The model
+has learned a correlation, not a mechanism.
+
+The hybrid model (grey-box + residual) achieves comparable performance (~96%) by
+a physically transparent route: the residual tfest term absorbs the DC offset
+directly from the simulation error during training, without confounding it with
+velocity. This approach would generalize correctly to any operating speed because
+the correction is applied as a fixed bias, not as a gain on a scheduling variable.
+
+
+### Summary of what each model is actually doing
+
+| Model | What explains its performance |
+|---|---|
+| Physical | Correct dynamics, wrong DC reference due to sensor calibration |
+| Physical + DC offset | Correct dynamics, corrected reference — near-ceiling performance |
+| Black-box tfest (Y4 only) | Fits dynamics from data but inherits the same DC reference error |
+| Grey-box | Physically constrained dynamics, same DC reference error |
+| Hybrid | Grey-box dynamics plus residual that automatically absorbs the DC offset |
+| tfest with velocity | Correct dynamics plus velocity used as a proxy to correct per-experiment DC offset |
+
+The physical + DC offset and the hybrid achieve nearly identical results by
+different routes, which is strong evidence that the DC offset is the dominant
+source of error and the beam equation dynamics are otherwise sound.
