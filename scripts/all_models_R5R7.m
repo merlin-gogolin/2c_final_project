@@ -2,19 +2,19 @@
 close all; clear all; clc;
 
 all_exps_data = load('data/all_exps_data.mat');
-all_exps_data = all_exps_data.all_exps_data ; 
+all_exps_data = all_exps_data.all_exps_data;
 
 % Load Web model
 TP_sys_disc_01 = load('mat_files/TP_flat_web_disc_tr_coeffs.mat');
-TP_sys_disc_01 = TP_sys_disc_01.TP_sys_disc ; 
+TP_sys_disc_01 = TP_sys_disc_01.TP_sys_disc;
 
 %% Update iddata object
 
 all_exps_data.ExperimentName{strcmp(all_exps_data.ExperimentName,'28_4mm,')} = '28_4mm';
 
-all_exps_data.InputName{strcmp(all_exps_data.InputName,'fEdgeDetectorValue')}       = 'y0';
-all_exps_data.InputName{strcmp(all_exps_data.InputName,'ActualPosition')}            = 'u1';
-all_exps_data.InputName{strcmp(all_exps_data.InputName,'AI_PMSSpeedBendingRoller')} = 'velocity';
+all_exps_data.InputName{strcmp(all_exps_data.InputName,'fEdgeDetectorValue')}           = 'y0';
+all_exps_data.InputName{strcmp(all_exps_data.InputName,'ActualPosition')}                = 'u1';
+all_exps_data.InputName{strcmp(all_exps_data.InputName,'AI_PMSSpeedBendingRoller')}     = 'velocity';
 all_exps_data.InputName{strcmp(all_exps_data.InputName,'PID_WebEdgePositionControl_SP')} = 'setpoint';
 
 all_exps_data.OutputName{strcmp(all_exps_data.OutputName,'y_R1')} = 'y1';
@@ -82,13 +82,9 @@ cExpNames = {'1\_2mm', '2\_4mm', '3\_Splices1', '4\_Splices2', '5\_Splices3', '6
 
 dExperiments = str2double(extractBefore(cExperiments, '_'));
 
-% Train data
-cExpTrain = {'21_4mm_test2', '22_2mm_fast', '24_step_gain_1_75','25_step_gain_2_6','27_4mm_fast', '30_2mm' };
-% cExpTrain = {'21_4mm_test2', '24_step_gain_1_75','25_step_gain_2_6', '30_2mm' };
-
+cExpTrain = {'21_4mm_test2', '22_2mm_fast', '24_step_gain_1_75','25_step_gain_2_6','27_4mm_fast', '30_2mm'};
 dExpTrain = str2double(extractBefore(cExpTrain, '_'));
 
-% Test data
 cExpTest = {'28_4mm', '29_2mm_test2'};
 dExpTest = str2double(extractBefore(cExpTest, '_'));
 
@@ -101,9 +97,9 @@ end
 dShowPlots = 0;
 dSavePlots = 0;
 
-expNames     = {'21_4mm_test2','22_2mm_fast','24_step_gain_1_75','25_step_gain_2_6','26_splice_fast','27_4mm_fast','28_4mm','29_2mm_test2','30_2mm'};
-outNames     = {'y1','y4','y5','y7'};
-inNames      = {'y0','u1'};
+expNames      = {'21_4mm_test2','22_2mm_fast','24_step_gain_1_75','25_step_gain_2_6','26_splice_fast','27_4mm_fast','28_4mm','29_2mm_test2','30_2mm'};
+outNames      = {'y1','y4','y5','y7'};
+inNames       = {'y0','u1'};
 sectionTitles = {'R0-R1','R1-R4','R4-R5','R5-R7'};
 
 sel = all_exps_data(:, outNames, inNames, expNames);
@@ -171,7 +167,6 @@ E_   = 3.5e9;
 mu_  = .45;
 T_   = 100;
 v_   = 1.125;
-% v_ = 20.1;
 I_   = 1/2 * b_^3*h_;
 A_   = b_*h_;
 G_   = E_/(2*(1+mu_));
@@ -200,473 +195,7 @@ f3 = (KL * (sinh(KL)-KL)) / (KL*sinh(KL)+2*(1-cosh(KL)));
 
 s = tf([1 0], 1);
 
-%% Define physical Transfer function R4-R5
-
-f1_L5 = double(vpa(subs(f1, KL, Kgam_*L5)));
-f2_L5 = double(vpa(subs(f2, KL, Kgam_*L5)));
-f3_L5 = double(vpa(subs(f3, KL, Kgam_*L5)));
-
-numY5_Y4 = [-(f3_L5/tau5) f1_L5/(tau5^2)];
-denY5    = [1 (1/tau5)*f2_L5 (1/tau5^2)*f1_L5];
-TFY5_Y4  = tf(numY5_Y4, denY5);
-TF5      = [TFY5_Y4; s*TFY5_Y4];
-
-%% Check train and test data
-train_data = modify_iddata(all_exps_data(:, [2 3], [], dExpTrain));
-test_data  = modify_iddata(all_exps_data(:, [2 3], [], dExpTest));
-
-%% Estimate Transfer function R4-R5 without speed
-
-cPath = 'models/R4_R5/narrow/nospeed/model_1_2/';
-dLoadOrTrain = 0;
-dSaveModels  = 0;
-
-if dLoadOrTrain
-    opt = tfestOptions;
-    opt.Display = 'on';
-    opt.EnforceStability = true;
-    nz = [1]; np = [2];
-    TFest = tfest(train_data, np, nz, opt);
-    if dSaveModels
-        mkdir(cPath);
-        save(append(cPath,'TFest.mat'), 'TFest');
-    end
-else
-    TFest = load(append(cPath,'TFest.mat'));
-    TFest = TFest.TFest;
-end
-
-%% PLOTTING SEPARATED
-dSaveFigures = 0;
-models       = {'physical', 'estimated'};
-sim_models   = {TF5(1,:), TFest};
-exps_data_all = {test_data, test_data};
-
-for j = 1:length(models)
-    model_folder = fullfile(cPath, models{j});
-    if ~exist(model_folder, 'dir'); mkdir(model_folder); end
-    sim_model = sim_models{j};
-    for i = 1:length(dExpTest)
-        k = dExpTest(i);
-        figure; set(gcf, 'Position', [100, 100, 1600, 800]);
-        compare(exps_data_all{j}(:,:,:,i), sim_model);
-        if dSaveFigures
-            if j == 1
-                title('Simulated Response Comparison');
-                subtitle(['R4\_R5 Experiment: ', cExpNames{k}, '\_physical']);
-                exportgraphics(gcf, fullfile(model_folder, ['R4_R5_', cExperiments{k},'_physical','.png']));
-            elseif j == 2
-                title('Simulated Response Comparison');
-                subtitle(['R4\_R5 Experiment: ', cExpNames{k}, '\_est']);
-                exportgraphics(gcf, fullfile(model_folder, ['R4_R5_', cExperiments{k},'_est','.png']));
-            end
-        end
-    end
-end
-
-%% Grey-box estimation for R4-R5 (physics-informed)
-cPath = 'models/R4_R5/greybox_hybrid/dec10/';
-dLoadOrTrain = 0;   % 1 = train, 0 = load
-dSaveModels  = 0;
-
-train_data = modify_iddata(all_exps_data(:, [2 3], [], dExpTrain));
-test_data  = modify_iddata(all_exps_data(:, [2 3], [], dExpTest));
-
-% ===== Decimate =====
-decFactor      = 10;
-train_data_dec = resample(train_data, 1, decFactor);
-test_data_dec  = resample(test_data,  1, decFactor);
-
-if dLoadOrTrain
-
-    % ===== Initial model =====
-    theta0   = [tau5; f1_L5; f2_L5; f3_L5];
-    sys_init = idgrey('R45_greybox_model', theta0, 'c');
-
-    sys_init.InputName  = {'y4'};
-    sys_init.OutputName = {'y5'};
-
-    sys_init.Structure.Parameters(1).Minimum = 1e-6;
-    sys_init.Structure.Parameters(2).Minimum = 0;
-    sys_init.Structure.Parameters(3).Minimum = 0;
-
-    % ===== Grey-box estimation =====
-    opt = greyestOptions;
-    opt.Display      = 'on';
-    opt.SearchMethod = 'gna';
-    opt.SearchOptions.MaxIterations = 20;
-    opt.SearchOptions.Tolerance     = 1e-4;
-
-    sys_grey = greyest(train_data_dec, sys_init, opt);
-
-    % ===== Residual =====
-    % 1. Simulate grey-box on decimated training data
-    clear sim
-    n_exp = numel(train_data_dec.ExperimentName);
-    residual_outputs = cell(n_exp, 1);
-    for ei = 1:n_exp
-        exp_i  = getexp(train_data_dec, ei);
-        simout = sim(sys_grey, exp_i);
-        residual_outputs{ei} = exp_i.OutputData - simout.OutputData;
-    end
-    
-    % 2. Build residual iddata
-    residual_data = iddata(residual_outputs, train_data_dec.InputData, train_data_dec.Ts);
-    residual_data.ExperimentName = train_data_dec.ExperimentName;
-    residual_data.InputName      = train_data_dec.InputName;
-    residual_data.OutputName     = train_data_dec.OutputName;
-    
-    % 3. Fit residual model
-    sys_resid  = tfest(residual_data, 1, 0);
-    
-    % 4. Combine
-    sys_hybrid = sys_grey + sys_resid;
-
-    % ===== SAVE =====
-    if dSaveModels
-        mkdir(cPath);
-        save(fullfile(cPath, 'sys_grey.mat'),   'sys_grey');
-        save(fullfile(cPath, 'sys_resid.mat'),  'sys_resid');
-        save(fullfile(cPath, 'sys_hybrid.mat'), 'sys_hybrid');
-    end
-
-else
-    % ===== LOAD =====
-    sys_grey   = load(fullfile(cPath, 'sys_grey.mat'));   
-    sys_resid  = load(fullfile(cPath, 'sys_resid.mat'));  
-    sys_hybrid = load(fullfile(cPath, 'sys_hybrid.mat'));
-
-    sys_grey   = sys_grey.sys_grey;
-    sys_resid  = sys_resid.sys_resid;
-    sys_hybrid = sys_hybrid.sys_hybrid;
-end
-
-%% Trying some DC offsets
-clear sim
-
-% 4mm test
-exp1    = getexp(test_data, 1);
-t1      = (0:size(exp1,1)-1) * exp1.Ts;
-y4_idx  = strcmp(exp1.InputName, 'y4');
-y1_sim  = lsim(TF5(1,:), exp1.InputData(:, y4_idx), t1);
-offset_4mm = mean(exp1.OutputData - y1_sim);
-fprintf('Optimal DC offset for 4mm: %.4f\n', offset_4mm)
-
-% 2mm test
-exp2    = getexp(test_data, 2);
-t2      = (0:size(exp2,1)-1) * exp2.Ts;
-y2_sim  = lsim(TF5(1,:), exp2.InputData(:, y4_idx), t2);
-offset_2mm = mean(exp2.OutputData - y2_sim);
-fprintf('Optimal DC offset for 2mm: %.4f\n', offset_2mm)
-
-% Apply offset and compute fit
-y1_corrected = y1_sim + offset_4mm;
-y2_corrected = y2_sim + offset_2mm;
-
-fit_4mm = 100*(1 - norm(exp1.OutputData - y1_corrected) / norm(exp1.OutputData - mean(exp1.OutputData)));
-fit_2mm = 100*(1 - norm(exp2.OutputData - y2_corrected) / norm(exp2.OutputData - mean(exp2.OutputData)));
-
-fprintf('Physical + offset fit 4mm: %.2f%%\n', fit_4mm)
-fprintf('Physical + offset fit 2mm: %.2f%%\n', fit_2mm)
-
-%% ===== Compare all models =====
-figure;
-compare(getexp(test_data_dec, 1), TF5(1,:), TFest, sys_grey, sys_hybrid);
-% legend('Data', 'Physical', 'TFest', 'Grey-box', 'Hybrid');
-title('Model Comparison (R4 → R5) for 4mm');
-figure;
-compare(getexp(test_data_dec, 2), TF5(1,:), TFest, sys_grey, sys_hybrid);
-title('Model Comparison (R4 → R5) for 2mm');
-
-%% EXTRA PLOTTING
- 
-% ---- 4mm test ----
-exp1   = getexp(test_data, 1);
-t1     = (0:size(exp1,1)-1) * exp1.Ts;
-y4_idx = strcmp(exp1.InputName, 'y4');
- 
-y1_phys        = lsim(TF5(1,:), exp1.InputData(:, y4_idx), t1);
-offset_4mm     = mean(exp1.OutputData - y1_phys);
-y1_phys_offset = y1_phys + offset_4mm;
-fprintf('DC offset 4mm: %.6f\n', offset_4mm)
- 
-nmse = @(y, yhat) 100*(1 - norm(y - yhat)/norm(y - mean(y)));
-fit_phys_4mm        = nmse(exp1.OutputData, y1_phys);
-fit_phys_offset_4mm = nmse(exp1.OutputData, y1_phys_offset);
-fprintf('Physical fit 4mm:          %.2f%%\n', fit_phys_4mm)
-fprintf('Physical+offset fit 4mm:   %.2f%%\n', fit_phys_offset_4mm)
- 
-exp1_dec = getexp(test_data_dec, 1);
-t1_dec   = (0:size(exp1_dec,1)-1) * exp1_dec.Ts;
-
-[y1_grey_sim,   fit_grey_4mm]   = compare(exp1_dec, sys_grey);
-[y1_hybrid_sim, fit_hybrid_4mm] = compare(exp1_dec, sys_hybrid);
-[y1_tfest_sim,  fit_tfest_4mm]  = compare(exp1_dec, TFest);
-fprintf('Grey-box fit 4mm:          %.2f%%\n', fit_grey_4mm)
-fprintf('Hybrid fit 4mm:            %.2f%%\n', fit_hybrid_4mm)
-fprintf('TFest fit 4mm:             %.2f%%\n', fit_tfest_4mm)
-
-figure;
-plot(t1,     exp1.OutputData,         'k',   'LineWidth', 1.5, 'DisplayName', 'Measured y5'); hold on;
-plot(t1,     y1_phys,                 'b', 'LineWidth', 1,   'DisplayName', sprintf('Physical (%.1f%%)',        fit_phys_4mm));
-plot(t1,     y1_phys_offset,          'c',   'LineWidth', 1,   'DisplayName', sprintf('Physical+offset (%.1f%%)', fit_phys_offset_4mm));
-plot(t1_dec, y1_grey_sim.OutputData,  'r', 'LineWidth', 1,   'DisplayName', sprintf('Grey-box (%.1f%%)',        fit_grey_4mm));
-plot(t1_dec, y1_hybrid_sim.OutputData,'m',   'LineWidth', 1,   'DisplayName', sprintf('Hybrid (%.1f%%)',          fit_hybrid_4mm));
-plot(t1_dec, y1_tfest_sim.OutputData, 'g',   'LineWidth', 1,   'DisplayName', sprintf('TFest (%.1f%%)',           fit_tfest_4mm));
-legend('Location','best'); grid on;
-xlabel('t (s)'); ylabel('y5 (m)');
-title('Model Comparison (R4 → R5) — 4mm test');
-improvePlot;
-fprintf("4mm done\n");
-
-% ---- 2mm test ----
-exp2   = getexp(test_data, 2);
-t2     = (0:size(exp2,1)-1) * exp2.Ts;
- 
-y2_phys        = lsim(TF5(1,:), exp2.InputData(:, y4_idx), t2);
-offset_2mm     = mean(exp2.OutputData - y2_phys);
-y2_phys_offset = y2_phys + offset_2mm;
-fprintf('DC offset 2mm: %.6f\n', offset_2mm)
- 
-fit_phys_2mm        = nmse(exp2.OutputData, y2_phys);
-fit_phys_offset_2mm = nmse(exp2.OutputData, y2_phys_offset);
-fprintf('Physical fit 2mm:          %.2f%%\n', fit_phys_2mm)
-fprintf('Physical+offset fit 2mm:   %.2f%%\n', fit_phys_offset_2mm)
- 
-exp2_dec = getexp(test_data_dec, 2);
-t2_dec   = (0:size(exp2_dec,1)-1) * exp2_dec.Ts;
-
-[y2_grey_sim,   fit_grey_2mm]   = compare(exp2_dec, sys_grey);
-[y2_hybrid_sim, fit_hybrid_2mm] = compare(exp2_dec, sys_hybrid);
-[y2_tfest_sim,  fit_tfest_2mm]  = compare(exp2_dec, TFest);
-fprintf('Grey-box fit 2mm:          %.2f%%\n', fit_grey_2mm)
-fprintf('Hybrid fit 2mm:            %.2f%%\n', fit_hybrid_2mm)
-fprintf('TFest fit 2mm:             %.2f%%\n', fit_tfest_2mm)
-
-figure;
-plot(t2,     exp2.OutputData,         'k',   'LineWidth', 1.5, 'DisplayName', 'Measured y5'); hold on;
-plot(t2,     y2_phys,                 'b', 'LineWidth', 1,   'DisplayName', sprintf('Physical (%.1f%%)',        fit_phys_2mm));
-plot(t2,     y2_phys_offset,          'c',   'LineWidth', 1,   'DisplayName', sprintf('Physical+offset (%.1f%%)', fit_phys_offset_2mm));
-plot(t2_dec, y2_grey_sim.OutputData,  'r', 'LineWidth', 1,   'DisplayName', sprintf('Grey-box (%.1f%%)',        fit_grey_2mm));
-plot(t2_dec, y2_hybrid_sim.OutputData,'m',   'LineWidth', 1,   'DisplayName', sprintf('Hybrid (%.1f%%)',          fit_hybrid_2mm));
-plot(t2_dec, y2_tfest_sim.OutputData, 'g',   'LineWidth', 1,   'DisplayName', sprintf('TFest (%.1f%%)',           fit_tfest_2mm));
-legend('Location','best'); grid on;
-xlabel('t (s)'); ylabel('y5 (m)');
-title('Model Comparison (R4 → R5) — 2mm test');
-improvePlot;
-fprintf("2mm done\n");
-
-%% Check train and test data — R4-R5 with speed
-train_data = modify_iddata(all_exps_data(:, [2 3], [5], dExpTrain));
-test_data  = modify_iddata(all_exps_data(:, [2 3], [5], dExpTest));
-
-%% Estimate Transfer function R4-R5 with speed
-
-cPath = 'models/R4_R5/narrow/speed/model_1_2_and_1_2/';
-dLoadOrTrain = 0;
-dSaveModels  = 0;
-
-if dLoadOrTrain
-    opt = tfestOptions;
-    opt.Display = 'on';
-    opt.EnforceStability = true;
-    nz = [1 1]; np = [2 2];
-    TFest_speed = tfest(train_data, np, nz, opt);
-    if dSaveModels
-        mkdir(cPath);
-        save(append(cPath,'TFest.mat'), 'TFest_speed');
-    end
-else
-    TFest_speed = load(append(cPath,'TFest.mat'));
-    TFest_speed = TFest_speed.TFest;
-end
-
-%% PLOTTING
-
-dSaveFigures  = 0;
-models        = {'physical', 'estimated'};
-sim_models    = {TF5(1,:), TFest_speed};
-exps_data_all = {test_data, test_data};
-
-for j = 1:length(models)
-    model_folder = fullfile(cPath, models{j});
-    if ~exist(model_folder, 'dir'); mkdir(model_folder); end
-    sim_model = sim_models{j};
-    for i = 1:length(dExpTest)
-        k = dExpTest(i);
-        figure; set(gcf, 'Position', [100, 100, 1600, 800]);
-        compare(exps_data_all{j}(:,:,:,i), sim_model);
-        if dSaveFigures
-            if j == 1
-                title('Simulated Response Comparison');
-                subtitle(['R4\_R5 Experiment: ', cExpNames{k}, '\_physical']);
-                exportgraphics(gcf, fullfile(model_folder, ['R4_R5_', cExperiments{k},'_physical','.png']));
-            elseif j == 2
-                title('Simulated Response Comparison');
-                subtitle(['R4\_R5 Experiment: ', cExpNames{k}, '\_est']);
-                exportgraphics(gcf, fullfile(model_folder, ['R4_R5_', cExperiments{k},'_est','.png']));
-            end
-        end
-    end
-end
-
-%% ===== Compare all models =====
-figure;
-compare(getexp(test_data_dec, 1), TF5(1,:), TFest, sys_grey, sys_hybrid);
-% legend('Data', 'Physical', 'TFest', 'Grey-box', 'Hybrid');
-title('Model Comparison (R4 → R5) for 4mm, with speed');
-figure;
-compare(getexp(test_data_dec, 2), TF5(1,:), TFest, sys_grey, sys_hybrid);
-title('Model Comparison (R4 → R5) for 2mm, with speed');
-
-% Test data with velocity for speed model comparison
-test_data_speed     = modify_iddata(all_exps_data(:, [2 3], [5], dExpTest));
-test_data_speed_dec = resample(test_data_speed, 1, decFactor);
-
-% Compare speed model separately (needs velocity input)
-figure;
-compare(getexp(test_data_speed_dec, 1), TFest_speed);
-title('TFest with Speed — 4mm test');
-
-figure;
-compare(getexp(test_data_speed_dec, 2), TFest_speed);
-title('TFest with Speed — 2mm test');
-
-%% NL Grey-box estimation for R4-R5 (speed-varying tau)
-% Requires R45_nlgrey_model.m in the same directory
-% and training data that includes velocity as an input
- 
-cPath_nl     = 'models/R4_R5/nlgreybox/dec10/';
-dLoadOrTrain_nl = 0;   % 1 = train, 0 = load
-dSaveModels_nl  = 0;
- 
-% Training/test data must include velocity as second input
-train_data_nl = modify_iddata(all_exps_data(:, [2 3], [5], dExpTrain));
-test_data_nl  = modify_iddata(all_exps_data(:, [2 3], [5], dExpTest));
- 
-% Decimate
-train_data_nl_dec = resample(train_data_nl, 1, decFactor);
-test_data_nl_dec  = resample(test_data_nl,  1, decFactor);
- 
-if dLoadOrTrain_nl
- 
-    % ===== Initial parameters =====
-    % Pass as plain numeric cell array
-    parameters = {f1_L5; f2_L5; f3_L5; L5};
- 
-    % Initial states [x1; x2] = [position; velocity] of web lateral motion
-    initial_states = [0; 0];
- 
-    % Create nlgrey model
-    % Order: [ny, nu, nx] = [1 output, 2 inputs (y4+velocity), 2 states]
-    sys_nl_init = idnlgrey('R45_nlgrey_model', [1 2 2], parameters, initial_states, 0);
- 
-    sys_nl_init.InputName  = {'y4', 'velocity'};
-    sys_nl_init.OutputName = {'y5'};
- 
-    % Set parameter names after construction
-    sys_nl_init.Parameters(1).Name    = 'f1';
-    sys_nl_init.Parameters(2).Name    = 'f2';
-    sys_nl_init.Parameters(3).Name    = 'f3';
-    sys_nl_init.Parameters(4).Name    = 'L5';
- 
-    % Fix L5 — geometry is known
-    sys_nl_init.Parameters(4).Fixed   = true;
- 
-    % Set bounds
-    sys_nl_init.Parameters(1).Minimum = 0;
-    sys_nl_init.Parameters(2).Minimum = 0;
- 
-    % ===== Estimation options =====
-    opt_nl = nlgreyestOptions;
-    opt_nl.Display = 'on';
-    opt_nl.SearchMethod = 'gna';
-    opt_nl.SearchOptions.MaxIterations = 20;
- 
-    % ===== Estimate =====
-    sys_nlgrey = nlgreyest(train_data_nl_dec, sys_nl_init, opt_nl);
- 
-    disp('NL Grey-box estimated parameters [f1, f2, f3, L5]:')
-    getpar(sys_nlgrey, 'Value')
- 
-    % ===== Save =====
-    if dSaveModels_nl
-        mkdir(cPath_nl);
-        save(fullfile(cPath_nl, 'sys_nlgrey.mat'), 'sys_nlgrey');
-    end
- 
-else
-    % ===== Load =====
-    sys_nlgrey = load(fullfile(cPath_nl, 'sys_nlgrey.mat'));
-    sys_nlgrey = sys_nlgrey.sys_nlgrey;
-end
- 
-%% ===== Compare nlgrey vs speed tfest =====
-figure;
-compare(getexp(test_data_nl_dec, 1), TFest_speed, sys_nlgrey);
-title('NL Grey-box vs TFest-Speed — 4mm test');
-improvePlot;
- 
-figure;
-compare(getexp(test_data_nl_dec, 2), TFest_speed, sys_nlgrey);
-title('NL Grey-box vs TFest-Speed — 2mm test');
-improvePlot;
-
-%% Check train and test data — R4-R5 with speed and u1
-train_data = modify_iddata(all_exps_data(:, [2 3], [2 5], dExpTrain));
-test_data  = modify_iddata(all_exps_data(:, [2 3], [2 5], dExpTest));
-
-%% Estimate Transfer function R4-R5 with speed and u1
-
-cPath = 'models/R4_R5/narrow/speed/model_1_2_and_1_2_and_1_2/';
-dLoadOrTrain = 0;
-dSaveModels  = 0;
-
-if dLoadOrTrain
-    opt = tfestOptions;
-    opt.Display = 'on';
-    opt.EnforceStability = true;
-    nz = [1 1 1]; np = [2 2 2];
-    TFest_speed_u = tfest(train_data, np, nz, opt);
-    if dSaveModels
-        mkdir(cPath);
-        save(append(cPath,'TFest.mat'), 'TFest_speed_u');
-    end
-else
-    TFest_speed_u = load(append(cPath,'TFest.mat'));
-    TFest_speed_u = TFest_speed_u.TFest;
-end
-
-%% PLOTTING SEPARATED
-
-dSaveFigures  = 0;
-models        = {'physical', 'estimated'};
-sim_models    = {TF5(1,:), TFest_speed_u};
-exps_data_all = {test_data, test_data};
-
-for j = 1:length(models)
-    model_folder = fullfile(cPath, models{j});
-    if ~exist(model_folder, 'dir'); mkdir(model_folder); end
-    sim_model = sim_models{j};
-    for i = 1:length(dExpTest)
-        k = dExpTest(i);
-        figure; set(gcf, 'Position', [100, 100, 1600, 800]);
-        compare(exps_data_all{j}(:,:,:,i), sim_model);
-        if dSaveFigures
-            if j == 1
-                title('Simulated Response Comparison');
-                subtitle(['R4\_R5 Experiment: ', cExpNames{k}, '\_physical']);
-                exportgraphics(gcf, fullfile(model_folder, ['R4_R5_', cExperiments{k},'_physical','.png']));
-            elseif j == 2
-                title('Simulated Response Comparison');
-                subtitle(['R4\_R5 Experiment: ', cExpNames{k}, '\_est']);
-                exportgraphics(gcf, fullfile(model_folder, ['R4_R5_', cExperiments{k},'_est','.png']));
-            end
-        end
-    end
-end
-
-%% Define Transfer function R5-R7
+%% Define physical Transfer function R5-R7
 
 f1_L6 = double(vpa(subs(f1, KL, Kgam_*L6)));
 f2_L6 = double(vpa(subs(f2, KL, Kgam_*L6)));
@@ -697,7 +226,7 @@ TF_67_tf   = TF6(1)*TF7(1);
 TF_67_tf.u = 'y5';
 TF_67_tf.y = 'y7';
 
-%% Check train and test data — R5-R7
+%% Check train and test data
 train_data = modify_iddata(all_exps_data(:, [3 4], [], dExpTrain));
 test_data  = modify_iddata(all_exps_data(:, [3 4], [], dExpTest));
 
@@ -712,19 +241,20 @@ if dLoadOrTrain
     opt.Display = 'on';
     opt.EnforceStability = true;
     nz = [2]; np = [4];
-    TFest_speed_u = tfest(train_data, np, nz, opt);
+    TFest = tfest(train_data, np, nz, opt);
     if dSaveModels
         mkdir(cPath);
-        save(append(cPath,'TFest.mat'), 'TFest_speed_u');
+        save(append(cPath,'TFest.mat'), 'TFest');
     end
 else
-    TFest_speed_u = load(append(cPath,'TFest.mat'));
-    TFest_speed_u = TFest_speed_u.TFest;
+    TFest = load(append(cPath,'TFest.mat'));
+    TFest = TFest.TFest;
 end
 
+%% PLOTTING SEPARATED
 dSaveFigures  = 0;
 models        = {'physical', 'estimated'};
-sim_models    = {TF_67_tf, TFest_speed_u};
+sim_models    = {TF_67_tf, TFest};
 exps_data_all = {test_data, test_data};
 
 for j = 1:length(models)
@@ -748,6 +278,193 @@ for j = 1:length(models)
         end
     end
 end
+
+%% Grey-box estimation for R5-R7 (physics-informed)
+% Requires R57_greybox_model.m in the same directory.
+% Models both spans (R5-R6 and R6-R7) as a chained 4th-order system
+% with 8 parameters: [tau6, f1_6, f2_6, f3_6, tau7, f1_7, f2_7, f3_7]
+
+cPath = 'models/R5_R7/greybox_hybrid/dec10/';
+dLoadOrTrain = 0;
+dSaveModels  = 0;
+
+train_data = modify_iddata(all_exps_data(:, [3 4], [], dExpTrain));
+test_data  = modify_iddata(all_exps_data(:, [3 4], [], dExpTest));
+
+decFactor      = 10;
+train_data_dec = resample(train_data, 1, decFactor);
+test_data_dec  = resample(test_data,  1, decFactor);
+
+if dLoadOrTrain
+
+    theta0   = [tau6; f1_L6; f2_L6; f3_L6; tau7; f1_L7; f2_L7; f3_L7];
+    sys_init = idgrey('R57_greybox_model', theta0, 'c');
+
+    sys_init.InputName  = {'y5'};
+    sys_init.OutputName = {'y7'};
+
+    sys_init.Structure.Parameters(1).Minimum = 1e-6;  % tau6
+    sys_init.Structure.Parameters(2).Minimum = 0;     % f1_6
+    sys_init.Structure.Parameters(3).Minimum = 0;     % f2_6
+    % theta(4) = f3_6, unbounded
+    sys_init.Structure.Parameters(5).Minimum = 1e-6;  % tau7
+    sys_init.Structure.Parameters(6).Minimum = 0;     % f1_7
+    sys_init.Structure.Parameters(7).Minimum = 0;     % f2_7
+    % theta(8) = f3_7, unbounded
+
+    opt = greyestOptions;
+    opt.Display      = 'on';
+    opt.SearchMethod = 'gna';
+    opt.SearchOptions.MaxIterations = 20;
+    opt.SearchOptions.Tolerance     = 1e-4;
+
+    sys_grey = greyest(train_data_dec, sys_init, opt);
+
+    % Residual
+    clear sim
+    n_exp = numel(train_data_dec.ExperimentName);
+    residual_outputs = cell(n_exp, 1);
+    for ei = 1:n_exp
+        exp_i  = getexp(train_data_dec, ei);
+        simout = sim(sys_grey, exp_i);
+        residual_outputs{ei} = exp_i.OutputData - simout.OutputData;
+    end
+
+    residual_data = iddata(residual_outputs, train_data_dec.InputData, train_data_dec.Ts);
+    residual_data.ExperimentName = train_data_dec.ExperimentName;
+    residual_data.InputName      = train_data_dec.InputName;
+    residual_data.OutputName     = train_data_dec.OutputName;
+
+    sys_resid  = tfest(residual_data, 1, 0);
+    sys_hybrid = sys_grey + sys_resid;
+
+    if dSaveModels
+        mkdir(cPath);
+        save(fullfile(cPath, 'sys_grey.mat'),   'sys_grey');
+        save(fullfile(cPath, 'sys_resid.mat'),  'sys_resid');
+        save(fullfile(cPath, 'sys_hybrid.mat'), 'sys_hybrid');
+    end
+
+else
+    sys_grey   = load(fullfile(cPath, 'sys_grey.mat'));
+    sys_resid  = load(fullfile(cPath, 'sys_resid.mat'));
+    sys_hybrid = load(fullfile(cPath, 'sys_hybrid.mat'));
+
+    sys_grey   = sys_grey.sys_grey;
+    sys_resid  = sys_resid.sys_resid;
+    sys_hybrid = sys_hybrid.sys_hybrid;
+end
+
+%% DC offsets
+clear sim
+
+exp1    = getexp(test_data, 1);
+t1      = (0:size(exp1,1)-1) * exp1.Ts;
+y5_idx  = strcmp(exp1.InputName, 'y5');
+y1_sim  = lsim(TF_67_tf, exp1.InputData(:, y5_idx), t1);
+offset_4mm = mean(exp1.OutputData - y1_sim);
+fprintf('Optimal DC offset for 4mm: %.4f\n', offset_4mm)
+
+exp2    = getexp(test_data, 2);
+t2      = (0:size(exp2,1)-1) * exp2.Ts;
+y2_sim  = lsim(TF_67_tf, exp2.InputData(:, y5_idx), t2);
+offset_2mm = mean(exp2.OutputData - y2_sim);
+fprintf('Optimal DC offset for 2mm: %.4f\n', offset_2mm)
+
+y1_corrected = y1_sim + offset_4mm;
+y2_corrected = y2_sim + offset_2mm;
+
+fit_4mm = 100*(1 - norm(exp1.OutputData - y1_corrected) / norm(exp1.OutputData - mean(exp1.OutputData)));
+fit_2mm = 100*(1 - norm(exp2.OutputData - y2_corrected) / norm(exp2.OutputData - mean(exp2.OutputData)));
+
+fprintf('Physical + offset fit 4mm: %.2f%%\n', fit_4mm)
+fprintf('Physical + offset fit 2mm: %.2f%%\n', fit_2mm)
+
+%% ===== Compare all models =====
+figure;
+compare(getexp(test_data_dec, 1), TF_67_tf, TFest, sys_grey, sys_hybrid);
+title('Model Comparison (R5 → R7) for 4mm');
+figure;
+compare(getexp(test_data_dec, 2), TF_67_tf, TFest, sys_grey, sys_hybrid);
+title('Model Comparison (R5 → R7) for 2mm');
+
+%% EXTRA PLOTTING
+
+% ---- 4mm test ----
+exp1   = getexp(test_data, 1);
+t1     = (0:size(exp1,1)-1) * exp1.Ts;
+y5_idx = strcmp(exp1.InputName, 'y5');
+
+y1_phys        = lsim(TF_67_tf, exp1.InputData(:, y5_idx), t1);
+offset_4mm     = mean(exp1.OutputData - y1_phys);
+y1_phys_offset = y1_phys + offset_4mm;
+fprintf('DC offset 4mm: %.6f\n', offset_4mm)
+
+nmse = @(y, yhat) 100*(1 - norm(y - yhat)/norm(y - mean(y)));
+fit_phys_4mm        = nmse(exp1.OutputData, y1_phys);
+fit_phys_offset_4mm = nmse(exp1.OutputData, y1_phys_offset);
+fprintf('Physical fit 4mm:          %.2f%%\n', fit_phys_4mm)
+fprintf('Physical+offset fit 4mm:   %.2f%%\n', fit_phys_offset_4mm)
+
+exp1_dec = getexp(test_data_dec, 1);
+t1_dec   = (0:size(exp1_dec,1)-1) * exp1_dec.Ts;
+
+[y1_grey_sim,   fit_grey_4mm]   = compare(exp1_dec, sys_grey);
+[y1_hybrid_sim, fit_hybrid_4mm] = compare(exp1_dec, sys_hybrid);
+[y1_tfest_sim,  fit_tfest_4mm]  = compare(exp1_dec, TFest);
+fprintf('Grey-box fit 4mm:          %.2f%%\n', fit_grey_4mm)
+fprintf('Hybrid fit 4mm:            %.2f%%\n', fit_hybrid_4mm)
+fprintf('TFest fit 4mm:             %.2f%%\n', fit_tfest_4mm)
+
+figure;
+plot(t1,     exp1.OutputData,         'k',   'LineWidth', 1.5, 'DisplayName', 'Measured y7'); hold on;
+plot(t1,     y1_phys,                 'b',   'LineWidth', 1,   'DisplayName', sprintf('Physical (%.1f%%)',        fit_phys_4mm));
+plot(t1,     y1_phys_offset,          'c',   'LineWidth', 1,   'DisplayName', sprintf('Physical+offset (%.1f%%)', fit_phys_offset_4mm));
+plot(t1_dec, y1_grey_sim.OutputData,  'r',   'LineWidth', 1,   'DisplayName', sprintf('Grey-box (%.1f%%)',        fit_grey_4mm));
+plot(t1_dec, y1_hybrid_sim.OutputData,'m',   'LineWidth', 1,   'DisplayName', sprintf('Hybrid (%.1f%%)',          fit_hybrid_4mm));
+plot(t1_dec, y1_tfest_sim.OutputData, 'g',   'LineWidth', 1,   'DisplayName', sprintf('TFest (%.1f%%)',           fit_tfest_4mm));
+legend('Location','best'); grid on;
+xlabel('t (s)'); ylabel('y7 (m)');
+title('Model Comparison (R5 → R7) — 4mm test');
+improvePlot;
+fprintf("4mm done\n");
+
+% ---- 2mm test ----
+exp2   = getexp(test_data, 2);
+t2     = (0:size(exp2,1)-1) * exp2.Ts;
+
+y2_phys        = lsim(TF_67_tf, exp2.InputData(:, y5_idx), t2);
+offset_2mm     = mean(exp2.OutputData - y2_phys);
+y2_phys_offset = y2_phys + offset_2mm;
+fprintf('DC offset 2mm: %.6f\n', offset_2mm)
+
+fit_phys_2mm        = nmse(exp2.OutputData, y2_phys);
+fit_phys_offset_2mm = nmse(exp2.OutputData, y2_phys_offset);
+fprintf('Physical fit 2mm:          %.2f%%\n', fit_phys_2mm)
+fprintf('Physical+offset fit 2mm:   %.2f%%\n', fit_phys_offset_2mm)
+
+exp2_dec = getexp(test_data_dec, 2);
+t2_dec   = (0:size(exp2_dec,1)-1) * exp2_dec.Ts;
+
+[y2_grey_sim,   fit_grey_2mm]   = compare(exp2_dec, sys_grey);
+[y2_hybrid_sim, fit_hybrid_2mm] = compare(exp2_dec, sys_hybrid);
+[y2_tfest_sim,  fit_tfest_2mm]  = compare(exp2_dec, TFest);
+fprintf('Grey-box fit 2mm:          %.2f%%\n', fit_grey_2mm)
+fprintf('Hybrid fit 2mm:            %.2f%%\n', fit_hybrid_2mm)
+fprintf('TFest fit 2mm:             %.2f%%\n', fit_tfest_2mm)
+
+figure;
+plot(t2,     exp2.OutputData,         'k',   'LineWidth', 1.5, 'DisplayName', 'Measured y7'); hold on;
+plot(t2,     y2_phys,                 'b',   'LineWidth', 1,   'DisplayName', sprintf('Physical (%.1f%%)',        fit_phys_2mm));
+plot(t2,     y2_phys_offset,          'c',   'LineWidth', 1,   'DisplayName', sprintf('Physical+offset (%.1f%%)', fit_phys_offset_2mm));
+plot(t2_dec, y2_grey_sim.OutputData,  'r',   'LineWidth', 1,   'DisplayName', sprintf('Grey-box (%.1f%%)',        fit_grey_2mm));
+plot(t2_dec, y2_hybrid_sim.OutputData,'m',   'LineWidth', 1,   'DisplayName', sprintf('Hybrid (%.1f%%)',          fit_hybrid_2mm));
+plot(t2_dec, y2_tfest_sim.OutputData, 'g',   'LineWidth', 1,   'DisplayName', sprintf('TFest (%.1f%%)',           fit_tfest_2mm));
+legend('Location','best'); grid on;
+xlabel('t (s)'); ylabel('y7 (m)');
+title('Model Comparison (R5 → R7) — 2mm test');
+improvePlot;
+fprintf("2mm done\n");
 
 %% Check train and test data — R5-R7 with speed
 train_data = modify_iddata(all_exps_data(:, [3 4], [5], dExpTrain));
@@ -764,19 +481,20 @@ if dLoadOrTrain
     opt.Display = 'on';
     opt.EnforceStability = true;
     nz = [2 1]; np = [4 2];
-    TFest_speed_u = tfest(train_data, np, nz, opt);
+    TFest_speed = tfest(train_data, np, nz, opt);
     if dSaveModels
         mkdir(cPath);
-        save(append(cPath,'TFest.mat'), 'TFest_speed_u');
+        save(append(cPath,'TFest.mat'), 'TFest_speed');
     end
 else
-    TFest_speed_u = load(append(cPath,'TFest.mat'));
-    TFest_speed_u = TFest_speed_u.TFest;
+    TFest_speed = load(append(cPath,'TFest.mat'));
+    TFest_speed = TFest_speed.TFest;
 end
 
+%% PLOTTING
 dSaveFigures  = 0;
 models        = {'physical', 'estimated'};
-sim_models    = {TF_67_tf, TFest_speed_u};
+sim_models    = {TF_67_tf, TFest_speed};
 exps_data_all = {test_data, test_data};
 
 for j = 1:length(models)
@@ -800,6 +518,97 @@ for j = 1:length(models)
         end
     end
 end
+
+%% ===== Compare all models =====
+figure;
+compare(getexp(test_data_dec, 1), TF_67_tf, TFest, sys_grey, sys_hybrid);
+title('Model Comparison (R5 → R7) for 4mm, with speed');
+figure;
+compare(getexp(test_data_dec, 2), TF_67_tf, TFest, sys_grey, sys_hybrid);
+title('Model Comparison (R5 → R7) for 2mm, with speed');
+
+% Test data with velocity for speed model comparison
+test_data_speed     = modify_iddata(all_exps_data(:, [3 4], [5], dExpTest));
+test_data_speed_dec = resample(test_data_speed, 1, decFactor);
+
+figure;
+compare(getexp(test_data_speed_dec, 1), TFest_speed);
+title('TFest with Speed — 4mm test');
+
+figure;
+compare(getexp(test_data_speed_dec, 2), TFest_speed);
+title('TFest with Speed — 2mm test');
+
+%% NL Grey-box estimation for R5-R7 (speed-varying tau)
+% Requires R57_nlgrey_model.m in the same directory.
+
+cPath_nl        = 'models/R5_R7/nlgreybox/dec10/';
+dLoadOrTrain_nl = 1;
+dSaveModels_nl  = 1;
+
+train_data_nl = modify_iddata(all_exps_data(:, [3 4], [5], dExpTrain));
+test_data_nl  = modify_iddata(all_exps_data(:, [3 4], [5], dExpTest));
+
+train_data_nl_dec = resample(train_data_nl, 1, decFactor);
+test_data_nl_dec  = resample(test_data_nl,  1, decFactor);
+
+if dLoadOrTrain_nl
+
+    parameters     = {f1_L6; f2_L6; f3_L6; f1_L7; f2_L7; f3_L7; L6; L7};
+    initial_states = [0; 0; 0; 0];
+
+    sys_nl_init = idnlgrey('R57_nlgrey_model', [1 2 4], parameters, initial_states, 0);
+
+    sys_nl_init.InputName  = {'y5', 'velocity'};
+    sys_nl_init.OutputName = {'y7'};
+
+    sys_nl_init.Parameters(1).Name = 'f1_6';
+    sys_nl_init.Parameters(2).Name = 'f2_6';
+    sys_nl_init.Parameters(3).Name = 'f3_6';
+    sys_nl_init.Parameters(4).Name = 'f1_7';
+    sys_nl_init.Parameters(5).Name = 'f2_7';
+    sys_nl_init.Parameters(6).Name = 'f3_7';
+    sys_nl_init.Parameters(7).Name = 'L6';
+    sys_nl_init.Parameters(8).Name = 'L7';
+
+    sys_nl_init.Parameters(7).Fixed = true;
+    sys_nl_init.Parameters(8).Fixed = true;
+
+    sys_nl_init.Parameters(1).Minimum = 0;
+    sys_nl_init.Parameters(2).Minimum = 0;
+    sys_nl_init.Parameters(4).Minimum = 0;
+    sys_nl_init.Parameters(5).Minimum = 0;
+
+    opt_nl = nlgreyestOptions;
+    opt_nl.Display = 'on';
+    opt_nl.SearchMethod = 'gna';
+    opt_nl.SearchOptions.MaxIterations = 10;
+
+    sys_nlgrey = nlgreyest(train_data_nl_dec, sys_nl_init, opt_nl);
+
+    disp('NL Grey-box estimated parameters [f1_6, f2_6, f3_6, f1_7, f2_7, f3_7, L6, L7]:')
+    getpar(sys_nlgrey, 'Value')
+
+    if dSaveModels_nl
+        mkdir(cPath_nl);
+        save(fullfile(cPath_nl, 'sys_nlgrey.mat'), 'sys_nlgrey');
+    end
+
+else
+    sys_nlgrey = load(fullfile(cPath_nl, 'sys_nlgrey.mat'));
+    sys_nlgrey = sys_nlgrey.sys_nlgrey;
+end
+
+%% ===== Compare nlgrey vs speed tfest =====
+figure;
+compare(getexp(test_data_nl_dec, 1), TFest_speed);
+title('NL Grey-box vs TFest-Speed — 4mm test');
+improvePlot;
+
+figure;
+compare(getexp(test_data_nl_dec, 2), TFest_speed);
+title('NL Grey-box vs TFest-Speed — 2mm test');
+improvePlot;
 
 %% Check train and test data — R5-R7 with speed and u1
 train_data = modify_iddata(all_exps_data(:, [3 4], [2 5], dExpTrain));
@@ -826,6 +635,7 @@ else
     TFest_speed_u = TFest_speed_u.TFest;
 end
 
+%% PLOTTING SEPARATED
 dSaveFigures  = 0;
 models        = {'physical', 'estimated'};
 sim_models    = {TF_67_tf, TFest_speed_u};
