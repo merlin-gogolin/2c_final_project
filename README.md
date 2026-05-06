@@ -11,6 +11,7 @@ The analysis is split into two independent scripts, one per roller section:
 
 - `all_models_R4R5.m` — models the R4 to R5 span
 - `all_models_R5R7.m` — models the R5 to R7 span (two chained spans)
+- `all_models_R1R4.m` — models the R1 to R4 span (three chained spans, actuated roller)
 
 Each script is self-contained and can be run independently.
 
@@ -44,6 +45,18 @@ producing a 4th-order transfer function. Model orders for tfest are doubled acco
 The nonlinear grey-box section is included but is computationally prohibitive for the
 chained 4th-order system and is noted as skipped in the results.
 
+### `all_models_R1R4.m`
+
+Applied to the R1 to R4 section, which is the most complex section in the system.
+The physical model chains three spans (R1-R2, R2-R3, R3-R4), producing a 6th-order
+transfer function in two inputs (y1 and u1). The actuated roller R1 sits at the
+upstream boundary of this section, meaning u1 enters directly into the first span's
+boundary conditions rather than being a remote input. Model orders for tfest reflect
+the higher-order physical structure. The nonlinear grey-box is computationally
+prohibitive at 8 states and is included for completeness only. There is no
+separate speed+u1 variant for this section because u1 is already a fundamental
+input to all R1-R4 models.
+
 ---
 
 ## Key Results
@@ -54,7 +67,7 @@ chained 4th-order system and is noted as skipped in the results.
 |---|---|---|
 | Physical (beam equations) | 89.0% | 65.3% |
 | Physical + DC offset | 96.3% | 93.1% |
-| Black-box tfest (Y5 only) | 89.6% | 70.2% |
+| Black-box tfest (Y4 only) | 89.6% | 70.2% |
 | Grey-box (greyest) | 89.2% | 65.6% |
 | Hybrid (grey-box + residual) | 96.3% | 94.3% |
 | Black-box tfest (Y4 + velocity) | 97.7% | 95.5% |
@@ -65,18 +78,31 @@ chained 4th-order system and is noted as skipped in the results.
 
 | Model | 4mm test | 2mm test |
 |---|---|---|
-| Physical (beam equations) | 77.3% | 80.6% |
-| Physical + DC offset | 92.1% | 96.2% |
-| Black-box tfest (Y5 only) | 93.0% | 94.2% |
-| Grey-box (greyest) | 78.0% | 80.9% |
-| Hybrid (grey-box + residual) | 93.7% | 96.2% |
-| Black-box tfest (Y5 + velocity) | 94.5% | 97.3% |
+| Physical (beam equations) | 80.6% | 77.3% |
+| Physical + DC offset | 96.2% | 92.1% |
+| Black-box tfest (Y5 only) | 94.2% | 93.0% |
+| Grey-box (greyest) | 80.9% | 78.0% |
+| Hybrid (grey-box + residual) | 96.2% | 93.7% |
+| Black-box tfest (Y5 + velocity) | 97.3% | 94.5% |
 | Nonlinear grey-box (nlgreyest) | N/A | N/A |
-| Black-box tfest (Y5 + velocity + U1) | -31.9% | -49.4% |
+| Black-box tfest (Y5 + velocity + U1) | -49.4% | -31.9% |
+
+### R1 to R4 span
+
+| Model | 4mm test | 2mm test |
+|---|---|---|
+| Physical (beam equations) | 63.3% | -3.4% |
+| Physical + DC offset | 74.0% | 61.6% |
+| Black-box tfest (Y1 + U1) | 20.9% | -57.7% |
+| Grey-box (greyest) | 83.1% | 34.5% |
+| Hybrid (grey-box + residual) | 93.2% | 90.6% |
+| Black-box tfest (Y1 + U1 + velocity) | 94.1% | 89.2% |
+| Nonlinear grey-box (nlgreyest) | N/A | N/A |
+| Black-box tfest (Y1 + U1 + velocity + extra U1) | N/A | N/A |
 
 See the Interpretation section for discussion of these results, including what
-negative fit percentages mean and why the pure tfest performs comparatively better
-for R5-R7 than for R4-R5.
+negative fit percentages mean and why R1-R4 presents a qualitatively harder
+modelling problem than the downstream sections.
 
 ---
 
@@ -168,46 +194,72 @@ included for completeness only:
         y  = C_mat*x;
     end
 
+**`R14_greybox_model.m`** — State-space function for `greyest` on the R1-R4 span.
+Implements three chained spans as an 8-state system with 13 parameters. The Y1 and
+u1 paths through span 2 require separate 2-state realisations because their output
+vectors differ:
+
+    function [A,B,C,D] = R14_greybox_model(theta, Ts, varargin)
+        % theta: [tau2, f1_2, f2_2, f3_2, k2, tau3, f1_3, f2_3, f3_3,
+        %         tau4, f1_4, f2_4, f3_4]
+        % States: x(1:2)=Y1->Y2, x(3:4)=u1->Y2, x(5:6)=Y2->Y3, x(7:8)=Y3->Y4
+        ...
+    end
+
+**`R14_nlgrey_model.m`** — ODE function for `nlgreyest` on the R1-R4 span.
+tau_i = L_i/v(t) and k2 = f3_2*v(t)^2/(L2*c1) are recomputed at each timestep.
+Note: computationally prohibitive in practice due to 8-state chained ODE:
+
+    function [dx, y] = R14_nlgrey_model(t, x, u, f1_2, f2_2, f3_2, ...)
+        ...
+    end
+
 ---
 
 ## Directory Structure
 
     .
-    ├── all_models_R4R5.m                <- R4 to R5 script (run this for R4-R5)
-    ├── all_models_R5R7.m                <- R5 to R7 script (run this for R5-R7)
+    ├── all_models_R4R5.m                <- R4 to R5 script
+    ├── all_models_R5R7.m                <- R5 to R7 script
+    ├── all_models_R1R4.m                <- R1 to R4 script
     ├── R45_greybox_model.m              <- required helper for R4-R5
     ├── R45_nlgrey_model.m               <- required helper for R4-R5
     ├── R57_greybox_model.m              <- required helper for R5-R7
     ├── R57_nlgrey_model.m               <- required helper for R5-R7
+    ├── R14_greybox_model.m              <- required helper for R1-R4
+    ├── R14_nlgrey_model.m               <- required helper for R1-R4
     │
-    ├── data/                            <- FILL IN (see below)
+    ├── data/
     │   └── all_exps_data.mat
     │
-    ├── mat_files/                       <- FILL IN (see below)
+    ├── mat_files/
     │   └── TP_flat_web_disc_tr_coeffs.mat
     │
-    ├── models/                          <- auto-generated on first train run
+    ├── models/
     │   ├── R4_R5/
     │   │   ├── narrow/nospeed/model_1_2/
     │   │   ├── narrow/speed/model_1_2_and_1_2/
     │   │   ├── narrow/speed/model_1_2_and_1_2_and_1_2/
     │   │   ├── greybox_hybrid/dec10/
     │   │   └── nlgreybox/dec10/
-    │   └── R5_R7/
-    │       ├── narrow/nospeed/model_2_4/
-    │       ├── narrow/speed/model_2_4_and_1_2/
-    │       ├── narrow/speed/model_2_4_and_1_2_and_1_2/
+    │   ├── R5_R7/
+    │   │   ├── narrow/nospeed/model_2_4/
+    │   │   ├── narrow/speed/model_2_4_and_1_2/
+    │   │   ├── narrow/speed/model_2_4_and_1_2_and_1_2/
+    │   │   ├── greybox_hybrid/dec10/
+    │   │   └── nlgreybox/dec10/
+    │   └── R1_R4/
+    │       ├── narrow/nospeed/model_6_3_and_2_0/
+    │       ├── narrow/speed/model_6_3_and_2_0_and_2_1/
     │       ├── greybox_hybrid/dec10/
     │       └── nlgreybox/dec10/
     │
-    └── plots/                           <- auto-generated if save flags are on
+    └── plots/
         └── physical_model/
 
 ---
 
 ## Data Requirements
-
-To replicate results, you need to provide two files.
 
 ### `data/all_exps_data.mat`
 
@@ -215,7 +267,6 @@ A MATLAB System Identification Toolbox `iddata` object containing all 30 experim
 sampled at 100 Hz, with the following signals:
 
 **Outputs:** `y_R1`, `y_R4`, `y_R5`, `y_R7`
-(lateral web position at rollers 1, 4, 5, 7, in mm)
 
 **Inputs:** `fEdgeDetectorValue`, `ActualPosition`, `AI_PMSSpeedBendingRoller`,
 `PID_WebEdgePositionControl_SP`
@@ -225,26 +276,22 @@ sampled at 100 Hz, with the following signals:
 ### `mat_files/TP_flat_web_disc_tr_coeffs.mat`
 
 A pre-computed discrete-time state-space model (`TP_sys_disc`) of the full web
-transport system, used for physical model validation plots in the early sections
-of each script.
+transport system, used for physical model validation plots.
 
 ---
 
 ## Running the Scripts
 
-1. Place all four helper `.m` files in the same folder as the scripts.
-2. Fill in `data/` and `mat_files/` as described above.
-3. Open either `all_models_R4R5.m` or `all_models_R5R7.m` in MATLAB.
-4. Run sections in order using `Ctrl+Enter`.
-5. By default all `dLoadOrTrain` flags are set to `0` (load pre-saved models).
-   To retrain, set `dLoadOrTrain = 1` and `dSaveModels = 1` in the relevant
-   section before running it. Models are saved under `models/` automatically.
+1. Place all helper `.m` files in the same folder as the scripts.
+2. Open the relevant script in MATLAB.
+3. Run sections in order using `Ctrl+Enter`.
+4. By default all `dLoadOrTrain` flags are set to `0` (load pre-saved models).
+   Set `dLoadOrTrain = 1` and `dSaveModels = 1` to retrain.
 
-The grey-box sections decimate training data by a factor of 10 (100 Hz to 10 Hz)
-before estimation to keep computation tractable. Expect `greyest` to take a few
-minutes for R4-R5 and somewhat longer for R5-R7 due to the higher model order.
-The nonlinear grey-box (`nlgreyest`) for R5-R7 is extremely slow due to the
-4-state chained ODE and is not recommended to run in practice.
+Decimation by a factor of 10 (100 Hz to 10 Hz) is applied before grey-box
+estimation to keep computation tractable. The nonlinear grey-box models are
+included for completeness but are not recommended to run in practice: R5-R7
+is prohibitive at 4 states, and R1-R4 is more so at 8 states.
 
 ---
 
@@ -264,23 +311,24 @@ Parameters are computed analytically from:
 - Material properties: E = 3.5 GPa, mu = 0.45
 - Operating conditions: tension T = 100 N, speed v = 1.125 m/s
 
-The R5-R7 physical model chains two single-span transfer functions (R5-R6 and
-R6-R7) in series, producing a 4th-order system. The grey-box model for this
-section estimates 8 parameters (tau and f1, f2, f3 independently for each sub-span).
+The R5-R7 physical model chains two single-span transfer functions in series,
+producing a 4th-order system. The R1-R4 physical model chains three spans,
+producing a 6th-order system in two inputs. For the R1-R4 section, u1 enters
+through the upstream boundary condition of span 2, yielding a separate transfer
+function path: Y4/u1 has a constant numerator (no zeros) derived from the
+actuator boundary condition k2 = f3*v^2/(L2*c1), then shaped by the two
+downstream passive spans.
 
 Key findings from grey-box estimation on R4-R5:
 
-- tau nearly triples relative to the physical prediction (0.44 to 1.18 s),
-  suggesting the effective transport delay is much larger than geometry alone
-  predicts
-- f3 collapses to zero — no non-minimum phase behaviour is observed in practice,
-  meaning the system is actually easier to control than pure theory suggests
+- tau nearly triples relative to the physical prediction (0.44 to 1.18 s)
+- f3 collapses to zero — no non-minimum phase behaviour observed in practice
 - Most residual error is a small DC offset, not missing dynamics
 
-The difference between `greyest` and `nlgreyest` is that `greyest` fits a single
-fixed set of parameters, while `nlgreyest` allows tau = L/v(t) to vary continuously
-with the measured velocity signal at each timestep. In practice this did not improve
-results because web speed is approximately constant within each experiment.
+For R1-R4, grey-box estimation reveals a qualitatively different picture: the
+dominant errors are dynamic rather than a simple DC offset, and the residual
+correction in the hybrid captures genuine frequency-domain discrepancies rather
+than just a bias.
 
 ---
 
@@ -293,177 +341,205 @@ defined as:
 
     fit = 100 * (1 - ||y - y_hat|| / ||y - mean(y)||)
 
-where y is the measured output and y_hat is the model prediction. The denominator
-normalises by how much the signal varies around its own mean. This gives:
+where y is the measured output and y_hat is the model prediction. This gives:
 
 - 100% — perfect prediction
-- 0% — the model does no better than predicting the constant mean of the output
-- Negative — the model's predictions are further from the truth than simply
-  predicting the mean would be
+- 0% — the model does no better than predicting the constant mean
+- Negative — the model is actively worse than predicting a constant
 
-A negative fit percentage is a strong warning sign. It means the model is actively
-harmful: it introduces more error than ignoring all dynamics and guessing a constant.
-This is almost always a symptom of overfitting — the model found patterns in the
-training data that happen to hurt it on the test data.
+A negative fit percentage means the model introduces more error than ignoring
+all dynamics entirely. This is almost always a symptom of overfitting.
 
 
 ### What DC means and what a DC offset is
 
-The term DC (Direct Current) comes from electrical engineering, where it refers to
-a constant, non-varying signal. In control and signal processing, DC has been
-adopted to mean the zero-frequency, constant component of any signal.
+In a transfer function G(s), evaluating G(0) gives the DC gain: the ratio of
+output to input when the system has fully settled to a constant input. For the
+Sievers physical model, G(0) = 1 exactly. A DC offset is a constant bias
+between two signals that persists regardless of dynamics.
 
-In a transfer function G(s), the variable s encodes frequency. Evaluating G(0) —
-plugging in s = 0 — gives the DC gain: the ratio of output to input when the input
-is held perfectly constant forever and the system has fully settled. This is the
-same number you read off a step response once the transient has died out.
-
-For the Sievers physical model:
-
-    G(0) = (f1/tau^2) / (f1/tau^2) = 1
-
-The DC gain is exactly 1 by construction. This reflects a physical truth: with
-perfectly parallel rollers, uniform tension, and a straight web, a lateral
-displacement at the upstream roller propagates downstream unchanged in steady
-state. If y4 holds constant at some value, y5 must eventually settle to that
-same value.
-
-A DC offset is a constant bias between two signals — one is always shifted by a
-fixed amount relative to the other, regardless of the dynamics. In this dataset,
-y5_measured is consistently about 0.0002 mm higher than the physical model
-predicts. This is a zero-frequency error only. The dynamics — poles, zeros,
-frequency response — can all be perfectly correct while this constant shift remains.
+For R4-R5 and R5-R7, adding a measured DC offset to the physical model
+simulation recovers near-ceiling performance (~96%), demonstrating that the
+physics correctly captures the dynamics and only the absolute reference is wrong.
+For R1-R4, this correction only reaches 74%/62%, which is the key diagnostic
+showing that the R1-R4 physical model has genuine dynamic errors beyond a
+simple calibration mismatch.
 
 
 ### Why the DC offset exists
 
-The physical model predicts DC gain = 1 exactly, so any constant difference between
-the measured upstream and downstream position signals must come from outside the
-model. The most likely causes in order of probability are:
+The most likely causes in order of probability:
 
-**Sensor zeroing mismatch (most likely).** The position signals at each roller are
-measured by separate cameras calibrated independently. Standard camera calibration
-converts pixel coordinates to real-world millimetres but leaves small systematic
-errors in the absolute zero reference. A sub-millimetre calibration error in one
-camera appears as a constant offset in the data regardless of what the web is
-doing physically.
+**Sensor zeroing mismatch (most likely).** Each roller uses a separate independently
+calibrated camera or edge sensor. Sub-millimetre calibration errors appear as
+constant offsets in the data.
 
-**Roller misalignment.** The Sievers model assumes all roller axes are exactly
-parallel. Any small skew in a roller axis exerts a steady-state lateral force on
-the web, pushing it to a slightly different equilibrium than the model predicts.
-Deshpande et al. (2026) explicitly note this as a limitation of the physics-based
-approach for this system.
+**Roller misalignment.** Any small skew in a roller axis exerts a steady-state
+lateral force, shifting the equilibrium position.
 
-**Web camber.** Real webs have built-in lateral curvature from the manufacturing
-process. A cambered web steers itself toward a preferred lateral position determined
-by its natural geometry, introducing a constant lateral forcing term that is
-entirely absent from the Sievers equations.
+**Web camber.** Built-in lateral curvature from the manufacturing process steers
+the web toward a geometry-determined equilibrium absent from the Sievers model.
 
-**Non-uniform tension.** The model assumes uniform tension across the web width.
-In practice, tension varies due to web formation history, edge effects, and roller
-crown profiles, shifting the equilibrium position slightly.
-
-The key implication is that this is an installation and calibration issue, not a
-modelling failure. The beam dynamics are essentially correct. Correcting for offsets
-of sub-millimetre magnitude recovers near-ceiling performance for both sections.
+**Non-uniform tension.** Tension variation across the web width shifts the
+equilibrium position.
 
 
 ### Why pure tfest performs comparatively better for R5-R7 than R4-R5
 
-For R4-R5, the physical model scores ~89% and the pure black-box tfest scores ~89.6%
-— essentially identical. For R5-R7, the physical model scores 77-80% but the pure
-tfest scores 93-94% — a gap of roughly 15 percentage points.
+For R4-R5, physical and pure tfest score ~89% — essentially identical. For R5-R7,
+physical scores 77-80% but tfest scores 93-94% — a 15 percentage point gap.
 
-Two effects explain this.
-
-First, the R5-R7 tfest uses a higher model order (4 poles, 2 zeros vs 2 poles,
-1 zero for R4-R5). Those extra degrees of freedom give the optimizer room to shift
-the effective DC gain away from 1 and implicitly absorb the sensor offset, which
-the physical model cannot do by construction. For R4-R5, the lower-order tfest
-does not have enough freedom to do this as effectively, so it lands at roughly the
-same performance as the physical model.
-
-Second, the R5-R7 physical model chains two spans and compounds modeling errors
-from both. Any inaccuracy in how each sub-span is parameterised (wrong tau, edge
-effects, boundary condition approximations) multiplies across the cascade. The
-physical model therefore starts from a lower baseline for R5-R7, giving the
-data-driven model more room to improve.
+The higher model order for R5-R7 (4 poles, 2 zeros vs 2 poles, 1 zero) gives the
+optimizer room to shift the effective DC gain away from 1 and implicitly absorb
+the sensor offset. Additionally, chaining two spans compounds physical modeling
+errors, giving the data-driven model more room to improve from a lower baseline.
 
 
 ### Why adding U1 causes catastrophically negative results for R5-R7
 
-Adding U1 (actuator position) as an input to the R5-R7 model produces fit
-percentages of -31.9% (4mm) and -49.4% (2mm). These are not just bad — they are
-worse than predicting a constant. This is classic severe overfitting.
+Adding U1 to the R5-R7 model produces -31.9%/−49.4%. U1 is the position of the
+actuated roller R1, whose effect on the web has already been absorbed into y5
+by the time it reaches R5. The optimizer finds spurious training-set correlations
+between U1 and y7 that do not generalise. The effect is less severe for R4-R5
+because the model order is lower and U1 has a somewhat larger physical influence.
 
-The mechanism is straightforward. U1 is the position of the actuated roller R1,
-which directly drives the web at R1. By the time the web reaches R5 and R7, the
-effect of U1 has propagated through three additional roller sections and been
-substantially attenuated. For the R5-R7 sub-model specifically, U1 has essentially
-no direct causal effect — it is already absorbed into y5, which is the input.
+The consistent conclusion is that U1 should not be included as a direct input to
+downstream sub-models once its effect has already been absorbed into the upstream
+position signal.
 
-Despite this, the optimizer is given a high-order transfer function from U1 to y7
-(2 poles, 1 zero) and 6 experiments of training data. It finds spurious correlations
-between U1 and y7 in the training set — perhaps because the controller moves U1 in
-response to web deviations that also happen to correlate with downstream position
-for other reasons. These correlations do not generalize, and on the test set the
-U1 channel actively makes predictions worse rather than better.
 
-The same effect occurs for R4-R5 but is less severe (fit drops from 97.7% to 96.5%
-rather than going negative) because the model order is lower, giving the optimizer
-fewer parameters to overfit with, and because U1 has a somewhat larger physical
-influence on R4-R5 than on R5-R7.
+### Why R1-R4 is a fundamentally harder modelling problem
 
-The consistent conclusion across both sections is that U1 should not be included
-as a direct input to downstream sub-models once it has already been absorbed into
-the upstream position signal.
+The R1-R4 section differs from R4-R5 and R5-R7 in three ways that compound to
+make it structurally harder.
+
+**Three chained spans instead of one or two.** Each span introduces its own
+modelling approximations. Chaining three spans multiplies these errors, which
+is why the physical model scores 63.3%/−3.4% here compared to 89% and 77-80%
+for the downstream sections.
+
+**The actuated roller sits at the upstream boundary.** R1 is the control actuator.
+Its out-of-plane displacement introduces a boundary condition (k2 = f3·v²/(L2·c1))
+that is derived from idealised end-pivot geometry. Any deviation from this
+idealisation — friction, mechanical compliance, non-ideal pivot axis — appears
+as a systematic error in the u1 input channel that compounds through all three
+downstream spans.
+
+**Extreme span length heterogeneity.** L2 ≈ 0.27 m, L3 ≈ 1.59 m, L4 ≈ 2.16 m.
+The spans differ by nearly an order of magnitude, meaning each operates in a
+different dynamic regime with a different tau. This variety makes a single set
+of physical parameters harder to get right simultaneously across all three spans.
+
+
+### Why the physical model's failure for R1-R4 is dynamic, not just a bias
+
+The DC offset correction test is the sharpest diagnostic available. For R4-R5
+and R5-R7, adding the optimal constant offset brings performance to ~96%,
+confirming that the dynamics are correct and only the reference is wrong.
+
+For R1-R4, the same correction only reaches 74%/62%. The remaining ~20-30%
+of error cannot be explained by a constant shift. The physical model is
+predicting the wrong shape of response — wrong time constants, wrong gain
+profile across frequencies — not just a shifted version of the right response.
+The physical model's −3.4% score for the 2mm test means it is actively
+misleading: its predictions diverge from reality more than simply predicting
+the mean of y4 would.
+
+
+### Why pure tfest catastrophically overfits for R1-R4
+
+The 20.9%/−57.7% result for pure tfest is the worst in the study, worse even
+than the R5-R7 U1 overfitting case. Two effects combine.
+
+**Correlated inputs.** y1 and u1 are not independent. The controller drives u1
+in direct response to y1 measured at the same roller. This correlation makes
+the identification problem ill-conditioned: the optimizer cannot cleanly separate
+the y1 and u1 contributions to y4, and the high-order model (6+2 poles, 3+0
+zeros) has enough freedom to overfit this ambiguity.
+
+**Amplitude-dependent behaviour.** The 4mm and 2mm test experiments may excite
+slightly different operating regimes. A model fitted primarily on the 4mm
+training experiments can easily memorise 4mm patterns while failing at 2mm,
+which is exactly what the 20.9% vs −57.7% gap reflects.
+
+
+### Why the grey-box is protective despite the physical model's failure
+
+The grey-box scores 83.1%/34.5% — dramatically better than pure tfest despite
+starting from the same poor physical model baseline. The physical structure
+constrains the parameter search space enough to prevent catastrophic overfitting
+even when the initial parameters are significantly wrong.
+
+The large gap between 4mm (83.1%) and 2mm (34.5%) is informative. It is a
+signature of model bias rather than model variance. The grey-box has found
+parameters that work for one amplitude regime but do not transfer to the other.
+This is the kind of systematic error that the hybrid's residual correction is
+designed to address.
+
+
+### Why the hybrid's improvement is so large for the 2mm test
+
+The grey-box to hybrid jump across sections:
+
+- R4-R5: +7 pp for 4mm, +29 pp for 2mm
+- R5-R7: +15 pp for 4mm, +16 pp for 2mm
+- R1-R4: +10 pp for 4mm, **+56 pp for 2mm**
+
+For R4-R5, the residual tfest correction was essentially a DC term — a pole
+near the origin capturing a constant offset. For R1-R4, the residual must be
+absorbing genuine frequency-domain errors in the grey-box, not just a bias.
+The 56 percentage point jump means the residual correction is doing substantial
+dynamic modelling work, rescuing the 2mm prediction entirely.
+
+This makes the hybrid the most important model for R1-R4 specifically. It
+maintains the physical interpretability of the grey-box parametrisation while
+letting the data correct the systematic errors that the physics cannot represent.
+
+
+### What N/A means for tfest+U1 in R1-R4 versus R5-R7
+
+These two N/A entries mean different things and should not be conflated.
+
+For R5-R7, the N/A for tfest+U1 means the experiment was run and produced
+catastrophically negative results (−31.9%/−49.4%) that were excluded. The
+failure mode was severe overfitting from a physically irrelevant input channel.
+
+For R1-R4, the N/A for a "+U1" variant means the experiment is not applicable.
+U1 is already a fundamental input to every R1-R4 model — it enters through the
+actuated roller boundary condition in span 2. There is no separate "+U1"
+experiment to run because U1 cannot be removed from the R1-R4 problem.
 
 
 ### Why the improvement from adding velocity is not what it appears
 
-Adding velocity as a second input to tfest produces a large performance jump in
-both sections. It is tempting to interpret this as the model learning speed-dependent
-dynamics. The actual explanation is more mundane.
-
-The velocity signal is approximately constant within each experiment. Normal speed
-experiments sit at roughly 12.85 velocity units throughout; fast speed experiments
-sit at roughly 20.17. When the optimizer fits a two-input transfer function:
+Adding velocity as an input produces a large performance jump in all three
+sections. The velocity signal is approximately constant within each experiment:
+normal-speed experiments sit at ~12.85 velocity units, fast-speed at ~20.17.
+When the optimizer fits:
 
     y_out = G1(s) * y_in + G2(s) * velocity
 
-the G2(s) term has an input that barely varies. The only way a constant input can
-affect the output is through its DC gain. The optimizer discovers a large DC gain
-for G2 that, when multiplied by the velocity value, gives a different constant for
-each experiment — effectively a per-experiment bias correction.
+the G2(s) term receives a nearly constant input. The only way a constant input
+affects the output is through its DC gain. The optimizer discovers a large DC
+gain for G2 that, when multiplied by the experiment's velocity value, applies
+a different constant correction to each experiment — effectively a per-experiment
+bias lookup, not a learned physical dependence on speed.
 
-In other words, the velocity channel is not capturing how web dynamics change with
-speed. It is using velocity as a lookup key to identify which experiment is running
-and apply the appropriate DC offset correction.
-
-This has important consequences for generalization. If the model is evaluated at
-a speed not seen in training, the large DC gain on the velocity channel will
-extrapolate to produce an arbitrary offset that may be completely wrong. The model
-has learned a correlation, not a mechanism.
-
-The hybrid model achieves comparable performance by a physically transparent route:
-the residual tfest term absorbs the DC offset directly from the simulation error
-during training, without confounding it with velocity. This approach generalizes
-correctly to any operating speed because the correction is applied as a fixed bias,
-not as a gain on a scheduling variable.
+The hybrid achieves comparable performance by a physically transparent route:
+the residual tfest absorbs the offset from simulation error during training
+without confounding it with velocity. This approach generalises correctly to
+any operating speed because the correction is a fixed bias, not an extrapolating
+gain on a scheduling variable.
 
 
 ### Summary of what each model is actually doing
 
-| Model | What explains its performance |
-|---|---|
-| Physical | Correct dynamics, wrong DC reference due to sensor calibration |
-| Physical + DC offset | Correct dynamics, corrected reference — near-ceiling performance |
-| Black-box tfest (position only) | Fits dynamics from data; for R5-R7 the higher order implicitly absorbs the DC offset |
-| Grey-box | Physically constrained dynamics, same DC reference error as physical |
-| Hybrid | Grey-box dynamics plus residual that automatically absorbs the DC offset |
-| tfest with velocity | Uses velocity as a per-experiment bias lookup key — good performance but poor generalization |
-| tfest with velocity + U1 | Severe overfitting from a physically irrelevant high-order input channel |
-
-The physical + DC offset and the hybrid achieve nearly identical results by
-different routes in both sections, which is strong evidence that the DC offset
-is the dominant source of error and the beam equation dynamics are otherwise sound.
+| Model | R4-R5 / R5-R7 | R1-R4 |
+|---|---|---|
+| Physical | Correct dynamics, wrong DC reference | Genuinely wrong dynamics — three compounding sources of error |
+| Physical + DC offset | Near-ceiling once bias corrected (~96%) | Insufficient — only ~74%/62% because errors are dynamic, not a bias |
+| Black-box tfest (position inputs only) | Reasonable; absorbs DC offset via higher model order for R5-R7 | Catastrophically overfits due to correlated inputs and high model order |
+| Grey-box | Same DC reference error as physical | Protective against overfitting — physical structure constrains search space enough to avoid −57% failure mode |
+| Hybrid | DC offset absorbed by residual; near-ceiling | Residual captures genuine dynamic errors beyond DC; 56 pp improvement for 2mm shows residual is doing real dynamic work |
+| tfest with velocity | Uses velocity as per-experiment bias lookup | Same mechanism; comparable performance to hybrid |
+| tfest with velocity + U1 | Severe overfitting (R5-R7); modest drop (R4-R5) | Not applicable — U1 already a fundamental input |

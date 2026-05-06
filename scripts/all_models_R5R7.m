@@ -552,6 +552,8 @@ test_data_nl  = modify_iddata(all_exps_data(:, [3 4], [5], dExpTest));
 train_data_nl_dec = resample(train_data_nl, 1, decFactor);
 test_data_nl_dec  = resample(test_data_nl,  1, decFactor);
 
+%% SEPARATE
+
 if dLoadOrTrain_nl
 
     parameters     = {f1_L6; f2_L6; f3_L6; f1_L7; f2_L7; f3_L7; L6; L7};
