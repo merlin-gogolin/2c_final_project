@@ -558,6 +558,113 @@ title('Model Comparison (R0 → R1) — 2mm test');
 improvePlot;
 fprintf("2mm done\n");
 
+%% EXTRA PLOTTING
+
+nmse = @(y, yhat) 100*(1 - norm(y - yhat)/norm(y - mean(y)));
+r2   = @(y, yhat) 1 - sum((y - yhat).^2) / sum((y - mean(y)).^2);
+
+% ---- 4mm test ----
+exp1   = getexp(test_data, 1);
+t1     = (0:size(exp1,1)-1) * exp1.Ts;
+
+y1_phys_4mm        = lsim(TF_01, exp1.InputData, t1);
+offset_4mm         = mean(exp1.OutputData - y1_phys_4mm);
+y1_phys_offset_4mm = y1_phys_4mm + offset_4mm;
+
+fit_phys_4mm        = nmse(exp1.OutputData, y1_phys_4mm);
+fit_phys_offset_4mm = nmse(exp1.OutputData, y1_phys_offset_4mm);
+r2_phys_4mm         = r2(exp1.OutputData, y1_phys_4mm);
+r2_phys_offset_4mm  = r2(exp1.OutputData, y1_phys_offset_4mm);
+
+fprintf('DC offset 4mm:              %.6f mm\n', offset_4mm)
+fprintf('Physical fit 4mm:           %.2f%%  |  R2: %.4f\n', fit_phys_4mm,        r2_phys_4mm)
+fprintf('Physical+offset fit 4mm:    %.2f%%  |  R2: %.4f\n', fit_phys_offset_4mm, r2_phys_offset_4mm)
+
+exp1_dec = getexp(test_data_dec, 1);
+t1_dec   = (0:size(exp1_dec,1)-1) * exp1_dec.Ts;
+
+[y1_grey_sim_4mm,   fit_grey_4mm]   = compare(exp1_dec, sys_grey);
+[y1_hybrid_sim_4mm, fit_hybrid_4mm] = compare(exp1_dec, sys_hybrid);
+[y1_tfest_sim_4mm,  fit_tfest_4mm]  = compare(exp1_dec, TFest);
+
+r2_grey_4mm   = r2(exp1_dec.OutputData, y1_grey_sim_4mm.OutputData);
+r2_hybrid_4mm = r2(exp1_dec.OutputData, y1_hybrid_sim_4mm.OutputData);
+r2_tfest_4mm  = r2(exp1_dec.OutputData, y1_tfest_sim_4mm.OutputData);
+
+fprintf('Grey-box fit 4mm:           %.2f%%  |  R2: %.4f\n', fit_grey_4mm,   r2_grey_4mm)
+fprintf('Hybrid fit 4mm:             %.2f%%  |  R2: %.4f\n', fit_hybrid_4mm, r2_hybrid_4mm)
+fprintf('TFest fit 4mm:              %.2f%%  |  R2: %.4f\n', fit_tfest_4mm,  r2_tfest_4mm)
+
+figure;
+plot(t1,     exp1.OutputData,                  'k', 'LineWidth', 1.5, ...
+     'DisplayName', 'Measured y1'); hold on;
+plot(t1,     y1_phys_4mm,                      'b', 'LineWidth', 1, ...
+     'DisplayName', sprintf('Physical (%.1f%%, R2=%.3f)',        fit_phys_4mm,        r2_phys_4mm));
+plot(t1,     y1_phys_offset_4mm,               'c', 'LineWidth', 1, ...
+     'DisplayName', sprintf('Physical+offset (%.1f%%, R2=%.3f)', fit_phys_offset_4mm, r2_phys_offset_4mm));
+plot(t1_dec, y1_grey_sim_4mm.OutputData,       'r', 'LineWidth', 1, ...
+     'DisplayName', sprintf('Grey-box (%.1f%%, R2=%.3f)',        fit_grey_4mm,        r2_grey_4mm));
+plot(t1_dec, y1_hybrid_sim_4mm.OutputData,     'm', 'LineWidth', 1, ...
+     'DisplayName', sprintf('Hybrid (%.1f%%, R2=%.3f)',          fit_hybrid_4mm,      r2_hybrid_4mm));
+plot(t1_dec, y1_tfest_sim_4mm.OutputData,      'g', 'LineWidth', 1, ...
+     'DisplayName', sprintf('TFest (%.1f%%, R2=%.3f)',           fit_tfest_4mm,       r2_tfest_4mm));
+legend('Location','best'); grid on;
+xlabel('t (s)'); ylabel('y1 (mm)');
+title('Model Comparison (R0 → R1) — 4mm test');
+improvePlot;
+fprintf("4mm done\n");
+
+% ---- 2mm test ----
+exp2   = getexp(test_data, 2);
+t2     = (0:size(exp2,1)-1) * exp2.Ts;
+
+y1_phys_2mm        = lsim(TF_01, exp2.InputData, t2);
+offset_2mm         = mean(exp2.OutputData - y1_phys_2mm);
+y1_phys_offset_2mm = y1_phys_2mm + offset_2mm;
+
+fit_phys_2mm        = nmse(exp2.OutputData, y1_phys_2mm);
+fit_phys_offset_2mm = nmse(exp2.OutputData, y1_phys_offset_2mm);
+r2_phys_2mm         = r2(exp2.OutputData, y1_phys_2mm);
+r2_phys_offset_2mm  = r2(exp2.OutputData, y1_phys_offset_2mm);
+
+fprintf('DC offset 2mm:              %.6f mm\n', offset_2mm)
+fprintf('Physical fit 2mm:           %.2f%%  |  R2: %.4f\n', fit_phys_2mm,        r2_phys_2mm)
+fprintf('Physical+offset fit 2mm:    %.2f%%  |  R2: %.4f\n', fit_phys_offset_2mm, r2_phys_offset_2mm)
+
+exp2_dec = getexp(test_data_dec, 2);
+t2_dec   = (0:size(exp2_dec,1)-1) * exp2_dec.Ts;
+
+[y1_grey_sim_2mm,   fit_grey_2mm]   = compare(exp2_dec, sys_grey);
+[y1_hybrid_sim_2mm, fit_hybrid_2mm] = compare(exp2_dec, sys_hybrid);
+[y1_tfest_sim_2mm,  fit_tfest_2mm]  = compare(exp2_dec, TFest);
+
+r2_grey_2mm   = r2(exp2_dec.OutputData, y1_grey_sim_2mm.OutputData);
+r2_hybrid_2mm = r2(exp2_dec.OutputData, y1_hybrid_sim_2mm.OutputData);
+r2_tfest_2mm  = r2(exp2_dec.OutputData, y1_tfest_sim_2mm.OutputData);
+
+fprintf('Grey-box fit 2mm:           %.2f%%  |  R2: %.4f\n', fit_grey_2mm,   r2_grey_2mm)
+fprintf('Hybrid fit 2mm:             %.2f%%  |  R2: %.4f\n', fit_hybrid_2mm, r2_hybrid_2mm)
+fprintf('TFest fit 2mm:              %.2f%%  |  R2: %.4f\n', fit_tfest_2mm,  r2_tfest_2mm)
+
+figure;
+plot(t2,     exp2.OutputData,                  'k', 'LineWidth', 1.5, ...
+     'DisplayName', 'Measured y1'); hold on;
+plot(t2,     y1_phys_2mm,                      'b', 'LineWidth', 1, ...
+     'DisplayName', sprintf('Physical (%.1f%%, R2=%.3f)',        fit_phys_2mm,        r2_phys_2mm));
+plot(t2,     y1_phys_offset_2mm,               'c', 'LineWidth', 1, ...
+     'DisplayName', sprintf('Physical+offset (%.1f%%, R2=%.3f)', fit_phys_offset_2mm, r2_phys_offset_2mm));
+plot(t2_dec, y1_grey_sim_2mm.OutputData,       'r', 'LineWidth', 1, ...
+     'DisplayName', sprintf('Grey-box (%.1f%%, R2=%.3f)',        fit_grey_2mm,        r2_grey_2mm));
+plot(t2_dec, y1_hybrid_sim_2mm.OutputData,     'm', 'LineWidth', 1, ...
+     'DisplayName', sprintf('Hybrid (%.1f%%, R2=%.3f)',          fit_hybrid_2mm,      r2_hybrid_2mm));
+plot(t2_dec, y1_tfest_sim_2mm.OutputData,      'g', 'LineWidth', 1, ...
+     'DisplayName', sprintf('TFest (%.1f%%, R2=%.3f)',           fit_tfest_2mm,       r2_tfest_2mm));
+legend('Location','best'); grid on;
+xlabel('t (s)'); ylabel('y1 (mm)');
+title('Model Comparison (R0 → R1) — 2mm test');
+improvePlot;
+fprintf("2mm done\n");
+
 %% Check train and test data — R0-R1 with speed
 % Adds velocity as a third input channel (input index 5 in all_exps_data).
 train_data = all_exps_data(:, [1], [1 2 5], dExpTrain);
@@ -572,8 +679,8 @@ test_data  = all_exps_data(:, [1], [1 2 5], dExpTest);
 % dynamics. See the Interpretation section of the README for detail.
 
 cPath = 'models/R0_R1/narrow/speed/model_1_2_and_0_2_and_1_2/';
-dLoadOrTrain = 1;
-dSaveModels  = 1;
+dLoadOrTrain = 0;
+dSaveModels  = 0;
 
 if dLoadOrTrain
     opt = tfestOptions;
@@ -587,7 +694,7 @@ if dLoadOrTrain
     end
 else
     TFest_speed = load(append(cPath,'TFest.mat'));
-    TFest_speed = TFest_speed.TFest;
+    TFest_speed = TFest_speed.TFest_speed;
 end
 
 %% PLOTTING
@@ -726,3 +833,249 @@ figure;
 compare(getexp(test_data_nl_dec, 2), TFest_speed);
 title('NL Grey-box vs TFest-Speed — 2mm test');
 improvePlot;
+
+%% ===== NARX Neural Network (R0-R1) - Deep & Normalized =====
+cPath = 'models/R0_R1/narx/dec10/deep_normalized';
+dLoadOrTrain = 0;   
+dSaveModels  = 0;
+
+% 1. Increase memory: Look back 30 samples (adjust based on your sample rate)
+na = 30; 
+nb = 30;
+hiddenSizes = [30, 15]; % Deeper architecture
+
+% 2. Define asymmetric delays (Vectorized lookback)
+% nb_delays{input_index} = [min_delay : step : max_delay]
+% Python uses a 'downsamp' factor to skip samples
+ds = 5; 
+commonDelays = 1:ds:500;
+
+% --- Load 3-input data ---
+train_data_narx = resample(all_exps_data(:, [1], [1 2 3], dExpTrain), 1, decFactor);
+test_data_narx  = resample(all_exps_data(:, [1], [1 2 3], dExpTest),  1, decFactor);
+
+if dLoadOrTrain
+    u_train_raw = {};
+    y_train_raw = {};
+    for i = 1:numel(dExpTrain)
+        exp_i = getexp(train_data_narx, i);
+        u_train_raw = [u_train_raw, con2seq(exp_i.InputData')];
+        y_train_raw = [y_train_raw, con2seq(exp_i.OutputData')];
+    end
+
+    % 2. STANDARDIZATION (Crucial for deep networks)
+    % We calculate scaling factors based on the training data
+    [u_train, settings_u] = mapstd(cell2mat(u_train_raw));
+    [y_train, settings_y] = mapstd(cell2mat(y_train_raw));
+    
+    % Re-convert to cell arrays for NARX
+    u_train = con2seq(u_train);
+    y_train = con2seq(y_train);
+
+    % 3. Model Configuration
+    % net = narxnet(1:na, 1:nb, hiddenSizes);
+    net = narxnet(commonDelays, commonDelays, hiddenSizes);
+    net.trainFcn = 'trainlm'; % Bayesian Regularization
+    net.divideFcn = 'dividerand'; % BR doesn't use validation sets
+    net.divideParam.trainRatio = 0.70;
+    net.divideParam.valRatio   = 0.15;
+    net.divideParam.testRatio  = 0.15;
+    net.trainParam.epochs = 50; 
+    net.trainParam.min_grad = 1e-10; % Don't stop too early
+    net.trainParam.max_fail = 6;
+
+    % Prepare and Train
+    [Xs, Xi, Ai, Ts] = preparets(net, u_train, {}, y_train);
+    net = train(net, Xs, Ts, Xi, Ai);
+    
+    net_closed = closeloop(net);
+    
+    if dSaveModels
+        mkdir(cPath);
+        save(fullfile(cPath, 'net_data.mat'), 'net', 'net_closed', 'settings_u', 'settings_y');
+    end
+else
+    load(fullfile(cPath, 'net_data.mat'));
+end
+
+%% ===== Evaluate NARX on Test Data =====
+nmse = @(y, yhat) 100*(1 - norm(y - yhat)/norm(y - mean(y)));
+
+for i = 1:numel(dExpTest)
+    exp_i  = getexp(test_data_narx, i);
+    
+    % 1. Scale Test Inputs using Training Settings
+    u_test_raw = exp_i.InputData';
+    y_test_raw = exp_i.OutputData';
+    
+    u_test_s = mapstd('apply', u_test_raw, settings_u);
+    y_test_s = mapstd('apply', y_test_raw, settings_y);
+    
+    u_seq = con2seq(u_test_s);
+    y_seq = con2seq(y_test_s);
+    
+    % 2. Prepare and Run Simulation
+    [Xs, Xi, Ai, ~] = preparets(net, u_seq, {}, y_seq);
+    [~, Xf, Af] = net(Xs, Xi, Ai); % Open-loop warmup
+    
+    warmup = max(na, nb);
+    u_cl = u_seq(warmup + 1 : end);
+    
+    y_pred_s_seq = net_closed(u_cl, Xf(1,:), Af);
+    y_pred_s = cell2mat(y_pred_s_seq); 
+    
+    % 3. REVERSE SCALING (Convert back to mm)
+    y_pred = mapstd('reverse', y_pred_s, settings_y)';
+    y_true = exp_i.OutputData;
+    
+    % Force alignment
+    y_true_trim = y_true(end - length(y_pred) + 1 : end);
+    n = min(length(y_true_trim), length(y_pred));
+    y_true_trim = y_true_trim(1:n);
+    y_pred      = y_pred(1:n);
+    t = (0 : n-1) * exp_i.Ts;
+
+    % 4. DC Offset Correction
+    burnin = round(0.1 * n);
+    offset = mean(y_true_trim(burnin:end) - y_pred(burnin:end));
+    y_pred_corrected = y_pred + offset;
+
+    fit_raw = nmse(y_true_trim, y_pred);
+    fit_corrected = nmse(y_true_trim, y_pred_corrected);
+    
+    fprintf('Exp %d: Fit %.2f%% (Offset: %.4f mm)\n', i, fit_corrected, offset);
+
+    % Plotting
+    figure;
+    plot(t, y_true_trim, 'k', 'LineWidth', 1.5); hold on;
+    plot(t, y_pred_corrected, 'r', 'LineWidth', 1.2);
+    grid on; xlabel('Time (s)'); ylabel('y1 (mm)');
+    title(['Deep NARX - Exp ', num2str(i), ' (Fit: ', num2str(fit_corrected, 3), '%)']);
+    legend('Measured', 'NARX Optimized');
+    improvePlot;
+end
+
+%% ===== Evaluate NARX on Test Data =====
+nmse = @(y, yhat) 100*(1 - norm(y - yhat)/norm(y - mean(y)));
+r2   = @(y, yhat) 1 - sum((y - yhat).^2) / sum((y - mean(y)).^2);
+
+for i = 1:numel(dExpTest)
+    exp_i  = getexp(test_data_narx, i);
+
+    % 1. Scale Test Inputs using Training Settings
+    u_test_raw = exp_i.InputData';
+    y_test_raw = exp_i.OutputData';
+
+    u_test_s = mapstd('apply', u_test_raw, settings_u);
+    y_test_s = mapstd('apply', y_test_raw, settings_y);
+
+    u_seq = con2seq(u_test_s);
+    y_seq = con2seq(y_test_s);
+
+    % 2. Prepare and Run Simulation
+    [Xs, Xi, Ai, ~] = preparets(net, u_seq, {}, y_seq);
+    [~, Xf, Af] = net(Xs, Xi, Ai); % Open-loop warmup
+
+    warmup = max(na, nb);
+    u_cl = u_seq(warmup + 1 : end);
+
+    y_pred_s_seq = net_closed(u_cl, Xf(1,:), Af);
+    y_pred_s = cell2mat(y_pred_s_seq);
+
+    % 3. REVERSE SCALING (Convert back to mm)
+    y_pred = mapstd('reverse', y_pred_s, settings_y)';
+    y_true = exp_i.OutputData;
+
+    % Force alignment
+    y_true_trim = y_true(end - length(y_pred) + 1 : end);
+    n = min(length(y_true_trim), length(y_pred));
+    y_true_trim = y_true_trim(1:n);
+    y_pred      = y_pred(1:n);
+    t = (0 : n-1) * exp_i.Ts;
+
+    % 4. DC Offset Correction
+    burnin = round(0.1 * n);
+    offset = mean(y_true_trim(burnin:end) - y_pred(burnin:end));
+    y_pred_corrected = y_pred + offset;
+
+    fit_raw       = nmse(y_true_trim, y_pred);
+    fit_corrected = nmse(y_true_trim, y_pred_corrected);
+    r2_raw        = r2(y_true_trim, y_pred);
+    r2_corrected  = r2(y_true_trim, y_pred_corrected);
+
+    fprintf('Exp %d: NMSE %.2f%%  |  R2: %.4f  (Offset: %.4f mm)\n', ...
+            i, fit_corrected, r2_corrected, offset);
+
+    % Plotting
+    figure;
+    plot(t, y_true_trim,     'k', 'LineWidth', 1.5, 'DisplayName', 'Measured'); hold on;
+    plot(t, y_pred_corrected,'r', 'LineWidth', 1.2, ...
+         'DisplayName', sprintf('NARX (%.1f%%, R2=%.3f)', fit_corrected, r2_corrected));
+    grid on; xlabel('Time (s)'); ylabel('y1 (mm)');
+    title(sprintf('Deep NARX — Exp %d (NMSE: %.1f%%, R2: %.3f)', i, fit_corrected, r2_corrected));
+    legend('Location','best');
+    improvePlot;
+end
+
+%% ===== LOAD ONNX MODEL (Updated Syntax) =====
+onnxPath = 'models/R0_R1_Model_Best/pretrain/hiddensize_2_depth_2_dropout_0.5_downsamp_5_addedweight_5_noise_std_0/model.onnx';
+
+try
+    % The newer function replacing importONNXNetwork
+    importNet = importNetworkFromONNX(onnxPath);
+catch ME
+    error('If error persists after installing C++ Redistributable, try: doc importNetworkFromONNX');
+end
+
+% --- REQUIRED: Python Normalization Constants ---
+% These MUST match the 'mean_std' used in your Python train.py
+% Check your val_info.json for these exact values
+u_means = [0, 0, 0, 0]; % [EdgeDetector, ActualPos, Speed, y_R1]
+u_stds  = [1, 1, 1, 1]; 
+y_mean  = 0; 
+y_std   = 1;
+
+% Python Configuration from run_exps.py
+win_lens = [1500, 1000, 100, 1500]; 
+ds = 5; 
+
+%% ===== EVALUATION LOOP =====
+exp_i = getexp(test_data_narx, 1);
+u_raw = exp_i.InputData; 
+y_raw = exp_i.OutputData;
+
+% Feedback creation (Open-Loop Test)
+y_feedback = [y_raw(1); y_raw(1:end-1)];
+U_total = [u_raw, y_feedback]; 
+
+% Standardize
+U_scaled = (U_total - u_means) ./ u_stds;
+
+max_win = max(win_lens);
+y_pred_scaled = zeros(length(U_scaled), 1);
+
+for t = max_win+1 : length(U_scaled)
+    % Reconstruct the input vector exactly as NARX_Dataset does
+    input_vec = [];
+    for col = 1:4
+        % Extract and downsample
+        win = U_scaled(t-win_lens(col) : ds : t-1, col);
+        input_vec = [input_vec; win]; 
+    end
+    
+    % Predict using dlarray for the new dlnetwork format
+    % Input must be (Features x Batch)
+    dl_input = dlarray(input_vec, 'CB'); 
+    dl_out = predict(importNet, dl_input);
+    y_pred_scaled(t) = extractdata(dl_out);
+end
+
+% De-standardize
+y_pred = (y_pred_scaled * y_std) + y_mean;
+
+% Calculate RMSE on aligned data
+y_true_eval = y_raw(max_win+1:end);
+y_pred_eval = y_pred(max_win+1:end);
+
+final_rmse = sqrt(mean((y_true_eval - y_pred_eval).^2));
+fprintf('Python ONNX Model RMSE: %.4f mm\n', final_rmse);

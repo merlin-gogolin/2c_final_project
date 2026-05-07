@@ -166,6 +166,11 @@ def train_FCN_R0_R1_small(dfs, inputs_list, window_lens, base_folder, train_exps
                 loss = criterion(outputs, targets[:,:,0])
                 val_loss += loss.item()
 
+        # UPDATE TO RSME
+        train_rmse = math.sqrt(train_loss / len(train_loader))
+        val_rmse = math.sqrt(val_loss / len(val_loader))
+        print(f'Epoch {epoch+1}, Train RMSE: {train_rmse}, Validation RMSE: {val_rmse}')
+
         val_losses.append(val_loss / len(val_loader))
         print(f'Epoch {epoch+1}, Train Loss: {train_loss / len(train_loader)}, Validation Loss: {val_loss / len(val_loader)}')
 
@@ -264,6 +269,11 @@ def train_FCN_R0_R1_small(dfs, inputs_list, window_lens, base_folder, train_exps
         weights = weights.cpu().numpy()
         # Calculate percentage goodness of fit
         goodness_of_fit = 100 * (1 - ((true_outputs[:,:,0] - predicted_outputs) ** 2).sum() / ((true_outputs[:,:,0] - true_outputs[:,:,0].mean()) ** 2).sum())
+
+        # PRINT RMSE VALUE
+        mse_val = ((true_outputs[:,:,0] - predicted_outputs) ** 2).mean()
+        rmse_val = np.sqrt(mse_val)
+        print(f'Exp {name} - RMSE: {rmse_val:.4f} mm')
 
         true_outputs = true_outputs*mean_std['y_R1'][1] + mean_std['y_R1'][0]
         predicted_outputs = predicted_outputs*mean_std['y_R1'][1] + mean_std['y_R1'][0]

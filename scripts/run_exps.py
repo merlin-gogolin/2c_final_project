@@ -40,8 +40,8 @@ random.seed(10)
 torch.random.manual_seed(10)
 
 # directory where data is stored. Change if needed.
-data_dir = '/Users/samueljohngomez/MIT Dropbox/Samuel Gomez/MIT_Group_samuel/summer_course/data_raw' 
-model_folder = '/Users/samueljohngomez/MIT Dropbox/Samuel Gomez/MIT_Group_samuel/summer_course/models/'
+data_dir = 'C:/Users/mgogo/Projects/2.C01/project/data_raw/' 
+model_folder = 'C:/Users/mgogo/Projects/2.C01/project/models/'
 
 # Set options
 exp_running = 'R0_R1' # 'R1_R4'

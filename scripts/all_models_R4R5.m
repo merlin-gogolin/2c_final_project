@@ -419,7 +419,7 @@ title('Model Comparison (R4 → R5) — 4mm test');
 improvePlot;
 fprintf("4mm done\n");
 
-% ---- 2mm test ----
+%% ---- 2mm test ----
 exp2   = getexp(test_data, 2);
 t2     = (0:size(exp2,1)-1) * exp2.Ts;
  
